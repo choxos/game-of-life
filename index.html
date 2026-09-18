@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Game of Life</title>
+  <meta name="description" content="How much of your life is actually yours? See the free time ahead of you, then decide what fills it.">
+  <meta property="og:title" content="Game of Life">
+  <meta property="og:description" content="How much of your life is actually yours?">
+  <meta name="theme-color" content="#f8f5f0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a1714" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Instrument+Serif&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <script src="data/life-tables.js" defer></script>
+  <script src="js/model.js" defer></script>
+  <script src="js/cells.js" defer></script>
+  <script src="js/app.js" defer></script>
+</head>
+<body>
+  <header class="top wrap">
+    <a class="brand" href="#intro">
+      <svg class="glider" viewBox="0 0 26 26" aria-hidden="true"><rect x="9" y="0" width="8" height="8"/><rect x="18" y="9" width="8" height="8"/><rect x="0" y="18" width="8" height="8"/><rect x="9" y="18" width="8" height="8"/><rect x="18" y="18" width="8" height="8"/></svg>
+      Game of Life
+    </a>
+    <a class="top__link" href="#method">How it works</a>
+  </header>
+
+  <main>
+    <section class="intro wrap" id="intro">
+      <h1 class="intro__title reveal" style="--i: 0">How much of your life is actually yours?</h1>
+      <p class="intro__lede reveal" style="--i: 1">Describe a typical week. We’ll zoom out to the rest of your life, find the hours that are truly yours, and help you decide what fills them.</p>
+
+      <form class="madlib" id="form" autocomplete="off" novalidate>
+        <p class="reveal" style="--i: 2">I’m <span id="article">a</span> <input class="field" id="age" type="number" inputmode="numeric" min="10" max="100" aria-label="Your age">-year-old <select class="field" id="sex" aria-label="Sex, optional"><option value="b">person</option><option value="f">woman</option><option value="m">man</option></select> in <select class="field" id="country" aria-label="Country"></select>.</p>
+        <p class="reveal" style="--i: 3">I sleep about <select class="field" id="sleep" aria-label="Hours of sleep a night"></select> a night.</p>
+        <p class="reveal" style="--i: 4">I work or study <select class="field" id="work" aria-label="Hours of work or study a day"></select> a day, <select class="field" id="days" aria-label="Workdays a week"></select> a week, and commute <select class="field" id="commute" aria-label="Commuting time a day, there and back"></select> there and back.</p>
+        <p class="reveal" style="--i: 5">I’d like to stop working at <input class="field" id="retire" type="number" inputmode="numeric" min="30" max="100" aria-label="Age you plan to stop working">.</p>
+
+        <details class="tune reveal" style="--i: 6">
+          <summary>Fine-tune my day</summary>
+          <div class="tune__body">
+            <p class="tune__hint">Obligations come out of your free time. Anything you’d gladly do anyway belongs in “Mine.”</p>
+            <div class="buckets">
+              <section class="bucket" aria-labelledby="duty-h"><h2 id="duty-h">Obligations</h2><ul id="duty"></ul></section>
+              <section class="bucket bucket--mine" aria-labelledby="mine-h"><h2 id="mine-h">Mine</h2><ul id="mine"></ul></section>
+            </div>
+            <p class="tune__off">I get <select class="field" id="weeksOff" aria-label="Weeks off work a year"></select> off work a year, counting vacation and public holidays.</p>
+          </div>
+        </details>
+
+        <p class="warn" id="warn" role="status" hidden>That workday adds up to more than 24 hours, so the numbers below lean on your days off to balance it.</p>
+
+        <div class="intro__go reveal" style="--i: 7">
+          <a class="btn" href="#story">Show me</a>
+          <p class="hint">Tap any underlined answer to change it. Your answers never leave your browser.</p>
+        </div>
+      </form>
+    </section>
+
+    <section class="story" id="story" aria-label="Your life, zoomed">
+      <div class="story__stage">
+        <canvas class="story__canvas" id="stage" role="img" aria-label="A grid of squares, one for each week of your life"></canvas>
+      </div>
+      <div class="story__steps">
+        <article class="step" data-level="life">
+          <div class="step__card">
+            <h2>This is your life in weeks.</h2>
+            <p>Each square is one week. The faded ones are behind you: about <b data-k="livedWeeks"></b> so far.</p>
+            <p><span data-k="whoCap"></span> can expect about <b data-k="years"></b> more years, on average. That’s roughly <b data-k="aheadWeeks"></b> weeks.</p>
+            <p class="small">This is remaining life expectancy at your age, not life expectancy at birth minus your age.</p>
+          </div>
+        </article>
+        <article class="step" data-level="ahead">
+          <div class="step__card">
+            <h2>Most of it is already spoken for.</h2>
+            <ul class="legend">
+              <li><i class="sw sw--sleep"></i>Sleep <b data-k="ySleep"></b></li>
+              <li><i class="sw sw--work"></i>Work <b data-k="yWork"></b></li>
+              <li><i class="sw sw--commute"></i>Commuting <b data-k="yCommute"></b></li>
+              <li><i class="sw sw--admin"></i>Upkeep <b data-k="yAdmin"></b></li>
+              <li class="legend__yours"><i class="sw sw--yours"></i>Yours <b data-k="yFree"></b></li>
+            </ul>
+            <p data-k="aheadNote"></p>
+          </div>
+        </article>
+        <article class="step" data-level="yours">
+          <div class="step__card">
+            <p class="figure"><span id="figure">0</span> <span class="figure__unit">hours</span></p>
+            <h2>That’s the part of your life that is actually yours.</h2>
+            <p>About <b data-k="freeYears"></b> full years, or <b data-k="freePct"></b> of the time you have left, once sleep, work, commuting and upkeep are paid for.</p>
+            <p data-k="weekly"></p>
+          </div>
+        </article>
+        <article class="step" data-level="plans">
+          <div class="step__card">
+            <h2>What will fill it?</h2>
+            <p>Here is one way to split it. Every square is still a week of your own time.</p>
+            <p>Next, you’ll make the split your own.</p>
+          </div>
+        </article>
+        <article class="step" data-level="units">
+          <div class="step__card">
+            <h2 data-k="unitTitle"></h2>
+            <p data-k="unitText"></p>
+            <p data-k="unitCoda"></p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="plan wrap" id="plan">
+      <div class="plan__head">
+        <h2>Spend your <span data-k="freeHours"></span> hours.</h2>
+        <p>Drag a slider and the others make room, because time is zero-sum. Each row shows what its share could buy. The options within a row are alternatives, not a to-do list.</p>
+      </div>
+      <div class="bar" id="bar" aria-hidden="true"></div>
+      <ol class="alloc" id="alloc"></ol>
+      <button class="btn btn--quiet" id="resetShares" type="button">Reset the split</button>
+    </section>
+
+    <section class="fewer wrap" id="fewer">
+      <h2>Things you have fewer of than you think.</h2>
+      <dl class="tiles">
+        <div><dt>weekends</dt><dd data-k="weekends"></dd></div>
+        <div><dt>summers</dt><dd data-k="summers"></dd></div>
+        <div><dt>full moons</dt><dd data-k="moons"></dd></div>
+        <div><dt>sunsets</dt><dd data-k="sunsets"></dd></div>
+      </dl>
+      <ul class="habits">
+        <li>If you see an old friend <input class="field field--sm" id="fq0" type="number" inputmode="numeric" min="0" max="365" aria-label="Visits a year"> times a year, that’s about <b data-k="fq0"></b> more visits.</li>
+        <li>If you take <input class="field field--sm" id="fq1" type="number" inputmode="numeric" min="0" max="52" aria-label="Big trips a year"> big trips a year, that’s about <b data-k="fq1"></b> more trips.</li>
+        <li>If you read <input class="field field--sm" id="fq2" type="number" inputmode="numeric" min="0" max="365" aria-label="Books a year"> books a year, that’s about <b data-k="fq2"></b> more books.</li>
+      </ul>
+    </section>
+
+    <section class="change wrap" id="change">
+      <div class="change__head">
+        <h2>One small change.</h2>
+        <p>A few minutes a day, multiplied by every year they repeat.</p>
+      </div>
+      <ul class="changes" id="changes"></ul>
+    </section>
+
+    <section class="share wrap" id="share">
+      <div class="share__text">
+        <h2>Your life budget, on one card.</h2>
+        <p>Post it, send it, or keep it somewhere you’ll see it.</p>
+        <div class="share__actions">
+          <button class="btn" id="download" type="button">Download image</button>
+          <button class="btn btn--quiet" id="shareCard" type="button" hidden>Share</button>
+          <button class="btn btn--quiet" id="copyLink" type="button">Copy link</button>
+        </div>
+        <p class="small" id="shareStatus" role="status"></p>
+      </div>
+      <img class="share__card" id="card" alt="Your life budget card" width="1080" height="1350">
+    </section>
+
+    <section class="method wrap" id="method">
+      <h2>How it works</h2>
+      <div class="method__cols">
+        <div>
+          <h3>Years ahead</h3>
+          <p>We use remaining life expectancy, written e(x): the average number of years still ahead for people who have already reached your age in your country. It comes from the United Nations World Population Prospects 2024 life tables for 2026, medium variant, by single year of age. Tools that subtract your age from life expectancy at birth undercount, because having reached your age already improves the odds.</p>
+          <p>It is an average, not a forecast for you. These period tables assume today’s death rates hold steady; if they keep falling, your real number is likely a little higher.</p>
+          <h3>Time that is yours</h3>
+          <p>Waking hours, minus work and commuting until the age you stop working, minus daily upkeep for the rest of your life. A work year is 52 weeks minus your time off. You decide which parts of your day count as obligations.</p>
+        </div>
+        <div>
+          <h3>Conversions</h3>
+          <ul>
+            <li>Reading: adults read English silently at about 238 words a minute for nonfiction and 260 for fiction (Brysbaert, 2019, a meta-analysis of 190 studies). A typical novel runs about 80,000 words.</li>
+            <li>Languages: about 500 to 600 guided learning hours from beginner to B2 (Cambridge English). A time equivalence, not a promise.</li>
+            <li>Trips count 8 free hours a day. Movies are 2 hours, TV seasons 8.</li>
+            <li>Conversions in a row are alternatives. An hour can only be spent once.</li>
+          </ul>
+          <h3>Privacy</h3>
+          <p>Everything runs in your browser. Your answers live only in this page’s address, so a copied link carries them with it.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot wrap">
+    <p>Game of Life. Life tables: UN DESA, World Population Prospects 2024, CC BY 3.0 IGO.</p>
+  </footer>
+</body>
+</html>
