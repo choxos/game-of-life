@@ -422,7 +422,7 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 }
 
 .bar span.is-on, .bar span.is-hover { opacity: 1; }
-.bar span::before { content: ""; position: absolute; inset: -0.6rem -1px; }
+.bar span::before { content: ""; position: absolute; inset: -0.6rem 0; }
 .bar.is-dragging span { transition: opacity var(--dur-short) var(--ease-out); }
 
 .alloc { list-style: none; padding: 0; display: grid; gap: 1px; }
@@ -634,8 +634,9 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 @media (min-width: 60rem) and (min-height: 34rem) {
   html, body { height: 100%; overflow: hidden; }
   .app { height: 100vh; height: 100dvh; grid-template-rows: auto minmax(0, 1fr) auto; }
-  .board { min-height: 0; padding-block: clamp(0.6rem, 1.8vh, 1.25rem); }
-  .panel { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+  .board { min-height: 0; padding-block: clamp(0.6rem, 1.8vh, 1.25rem); padding-inline: max(0.5rem, calc(var(--gutter) - 0.5rem)); }
+  /* A little inner room so hover backgrounds and focus rings stay inside each panel. */
+  .panel { overflow-y: auto; overflow-x: hidden; padding-inline: 0.5rem; overscroll-behavior: contain; scrollbar-width: thin; }
   .weeks { overflow: hidden; }
   .stage { flex: 1 1 auto; height: auto; min-height: 0; }
 }
