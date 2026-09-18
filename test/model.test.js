@@ -90,4 +90,11 @@ const scroll = M.changes({ ...example, routine: [4.18, 0, 0, 0, 0, 0.5] }, b).fi
 near(scroll.h, 0.5 * M.DAYS * 47.3, 1e-6, 'phone change');
 assert.equal(M.changes(example, b).find(c => c.id === 'scroll'), undefined);
 
+// Quartiles bracket the median, and a day adds up to 24 hours.
+assert.ok(can.q1 < can.median && can.median < can.q3);
+const day = M.dayParts(example, b);
+near(day.workday.reduce((a, c) => a + c, 0), 24, 1e-9, 'workday hours');
+near(day.off[4], 24 - 8 - 4.18, 1e-9, 'day off is yours after sleep and upkeep');
+assert.equal(M.dayParts({ ...example, sleep: 12, work: 12, commute: 2 }, b).workday[4], 0);
+
 console.log('model ok');

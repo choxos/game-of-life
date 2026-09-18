@@ -75,6 +75,7 @@
         <div class="levels" role="group" aria-label="Zoom level">
           <button type="button" data-level="life" aria-pressed="false">Life</button>
           <button type="button" data-level="ahead" aria-pressed="false">Ahead</button>
+          <button type="button" data-level="day" aria-pressed="false">Day</button>
           <button type="button" data-level="yours" aria-pressed="false">Yours</button>
           <button type="button" data-level="plans" aria-pressed="false">Split</button>
           <button type="button" data-level="units" aria-pressed="false" data-k="unitTab">Books</button>
@@ -90,6 +91,15 @@
           <div class="caption" data-level="ahead" hidden>
             <p data-k="capAhead"></p>
             <p class="note" data-k="capWeekly"></p>
+            <div class="scrub">
+              <label for="retireRange">Stop working at</label>
+              <input id="retireRange" type="range" min="30" max="90" step="1">
+              <b id="retireOut"></b>
+              <button class="link" type="button" data-open="lives" data-k="compareLink">Compare with someone</button>
+            </div>
+          </div>
+          <div class="caption" data-level="day" hidden>
+            <p data-k="capDay"></p>
           </div>
           <div class="caption" data-level="yours" hidden>
             <p data-k="capYours"></p>
@@ -166,6 +176,30 @@
     </div>
   </dialog>
 
+  <dialog class="sheet" id="lives" aria-labelledby="lives-h">
+    <div class="sheet__body">
+      <div class="sheet__head"><h2 id="lives-h" tabindex="-1" autofocus>Compare two lives</h2><button class="close" type="button" data-close aria-label="Close">×</button></div>
+      <p class="note">Paste someone’s Game of Life link, or describe them. Their weeks appear next to yours in the Ahead view.</p>
+      <p><input class="field field--sm field--text field--wide" id="otherLink" type="url" placeholder="Paste their link" aria-label="Their link"></p>
+      <p class="madlib madlib--sm">
+        <input class="field field--text" id="oName" maxlength="20" placeholder="Name" aria-label="Their name">
+        is <span id="oArticle">a</span> <input class="field" id="oAge" type="number" inputmode="numeric" min="10" max="100" aria-label="Their age">-year-old
+        <select class="field" id="oSex" aria-label="Their sex, optional"><option value="b">person</option><option value="f">woman</option><option value="m">man</option></select>
+        in <select class="field" id="oCountry" aria-label="Their country"></select>.
+        They sleep <select class="field" id="oSleep" aria-label="Their hours of sleep"></select>,
+        work <select class="field" id="oWork" aria-label="Their hours of work a day"></select> a day,
+        <select class="field" id="oDays" aria-label="Their workdays a week"></select> a week,
+        commute <select class="field" id="oCommute" aria-label="Their commute"></select>,
+        and stop working at <input class="field" id="oRetire" type="number" inputmode="numeric" min="30" max="100" aria-label="Their retirement age">.
+      </p>
+      <div class="share__actions">
+        <button class="btn btn--sm" id="compareGo" type="button">Compare</button>
+        <button class="btn btn--quiet btn--sm" id="compareStop" type="button">Stop comparing</button>
+      </div>
+      <p class="note" id="compareStatus" role="status"></p>
+    </div>
+  </dialog>
+
   <dialog class="sheet sheet--wide" id="share" aria-labelledby="share-h">
     <div class="sheet__body">
       <div class="sheet__head"><h2 id="share-h" tabindex="-1" autofocus>Your life budget, as an image</h2><button class="close" type="button" data-close aria-label="Close">×</button></div>
@@ -192,12 +226,13 @@
         <div>
           <h3>Years ahead</h3>
           <p>We use remaining life expectancy, written e(x): the average number of years still ahead for people who have already reached your age in your country. It comes from the United Nations World Population Prospects 2024 life tables for 2026, medium variant, by single year of age. Subtracting your age from life expectancy at birth undercounts, because having reached your age already improves the odds.</p>
-          <p>An average hides a wide spread, so we also show when half and a quarter of people your age are still alive. By default today’s death rates are held fixed. The “keep falling” option follows the UN’s projected rates year by year instead, which usually adds a few years.</p>
+          <p>An average hides a wide spread, so the page leads with the age half of people your age live past, and gives your free hours as a range for the middle half of people like you: the hours you would have if you lived as long as the lower and the upper quartile. By default today’s death rates are held fixed. The “keep falling” option follows the UN’s projected rates year by year instead, which usually adds a few years.</p>
           <p>Healthy years are rough: they apply the WHO 2021 ratio of healthy life expectancy to life expectancy, at birth and at 60, to your remaining years.</p>
           <h3>Time that is yours</h3>
           <p>Waking hours, minus work and commuting until the age you stop working, minus daily upkeep for the rest of your life. A work year is 52 weeks minus your time off. You decide which parts of your day count as obligations.</p>
           <h3>People</h3>
           <p>Shared years are the expected time you are both alive, treating your chances as independent, from each person’s own life table.</p>
+          <p>Comparisons run the same model for the other person, with their own country, age and week.</p>
         </div>
         <div>
           <h3>Conversions</h3>

@@ -93,9 +93,11 @@
     const l = p.l[sex], base = Math.max(l[a], 1e-6);
     const S = l.slice(a).map(v => v / base);
     const openE = p[sex][100];
-    const median = yearsTo(S, 0.5, openE), q3 = yearsTo(S, 0.25, openE);
-    if (!cohort) return { years: p[sex][a], median, q3, S, openE, scale: 1 };
-    return { years: p.c[sex][a], median: p.cmed[sex][a], q3: p.cq3[sex][a], S, openE, scale: median > 0 ? p.cmed[sex][a] / median : 1 };
+    const q1 = yearsTo(S, 0.75, openE), median = yearsTo(S, 0.5, openE), q3 = yearsTo(S, 0.25, openE);
+    if (!cohort) return { years: p[sex][a], q1, median, q3, S, openE, scale: 1 };
+    // Cohort median and upper quartile come from the build; the lower quartile follows the same stretch.
+    const scale = median > 0 ? p.cmed[sex][a] / median : 1;
+    return { years: p.c[sex][a], q1: q1 * scale, median: p.cmed[sex][a], q3: p.cq3[sex][a], S, openE, scale };
   }
 
   // Share still alive t years from now.
@@ -160,6 +162,14 @@
     };
   }
 
+  // One day in hours: [sleep, work, commute, upkeep, yours], for a workday and for a day off.
+  function dayParts(inp, b) {
+    const workday = [inp.sleep, inp.work, inp.commute, b.admin];
+    const off = [inp.sleep, 0, 0, b.admin];
+    const close = hours => [...hours, Math.max(0, 24 - sum(hours))];
+    return { workday: close(workday), off: close(off) };
+  }
+
   // Integer counts proportional to weights that add up to total (largest remainder method).
   function apportion(weights, total) {
     const s = sum(weights);
@@ -220,7 +230,7 @@
   const Model = {
     DAYS, WEEKS, YEAR_H, WEEK_H, ROUTINE, DEFAULTS, CATEGORIES,
     clamp, remainingYears, yearsTo, lifeFacts, survivalAt, sharedYears, healthyYears, ageOn, daysBetween,
-    budget, apportion, yearRows, rebalance, unitHours, changes,
+    budget, dayParts, apportion, yearRows, rebalance, unitHours, changes,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Model;
   else root.Model = Model;

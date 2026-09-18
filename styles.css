@@ -378,6 +378,11 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 .tooltip span { color: var(--color-muted); }
 
 .captions { max-width: 46rem; }
+
+.scrub { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem var(--space-sm); font-size: var(--text-sm); }
+.scrub label { color: var(--color-muted); }
+.scrub input[type="range"] { width: 9rem; }
+.scrub .link { margin-left: auto; }
 .caption { display: grid; gap: 0.3rem; }
 
 .focus { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-md); padding-top: 0.2rem; font-size: var(--text-sm); }
@@ -577,6 +582,9 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 .chip__move:active { transform: scale(0.94); }
 .chip__move svg { width: 0.95rem; height: 0.95rem; transform: rotate(90deg); }
 .bucket--mine .chip__move svg { transform: rotate(-90deg); }
+
+.madlib--sm { font-size: 1.15rem; line-height: 1.7; }
+.field--wide { width: 100%; }
 
 .people { list-style: none; padding: 0; display: grid; gap: var(--space-sm); }
 

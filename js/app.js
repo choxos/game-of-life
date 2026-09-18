@@ -15,6 +15,7 @@
 
   const nf = new Intl.NumberFormat('en-US');
   const int = n => nf.format(Math.round(n));
+  const rough = n => int(Number(n.toPrecision(3))); // for ranges, where more digits would be false precision
   const one = n => (Math.round(n * 10) / 10).toFixed(1);
   const pct = n => `${Math.round(n)}%`;
   const years = n => `${one(n)} ${one(n) === '1.0' ? 'year' : 'years'}`;
@@ -77,38 +78,56 @@
     vs: 'JPN',
     custom: { label: 'Something else', unit: 'sessions', h: 2 },
     people: [],
+    other: null,
   };
 
   // Lists from older links may be one item short; pad them with defaults.
   const fill = (list, n, pad) => (list.length === n - 1 ? [...list, pad] : list);
 
-  function readHash(hash) {
-    const q = new URLSearchParams(hash.replace(/^#/, ''));
-    if (!q.has('age')) return false;
-    const num = (key, lo, hi, fallback) => {
+  const readers = q => ({
+    num: (key, lo, hi, fallback) => {
       const v = Number(q.get(key));
       return q.has(key) && q.get(key) !== '' && Number.isFinite(v) ? M.clamp(v, lo, hi) : fallback;
-    };
-    const list = (key, n, lo, hi, fallback, pad) => {
+    },
+    list: (key, n, lo, hi, fallback, pad) => {
       const v = fill((q.get(key) || '').split(',').filter(x => x !== '').map(Number), n, pad);
       return v.length === n && v.every(Number.isFinite) ? v.map(x => M.clamp(x, lo, hi)) : fallback;
-    };
-    S.age = Math.round(num('age', 10, 100, S.age));
-    if (['b', 'f', 'm'].includes(q.get('sex'))) S.sex = q.get('sex');
-    if (Object.hasOwn(T.places, q.get('in') || '')) S.country = q.get('in');
-    if (Object.hasOwn(T.places, q.get('vs') || '')) S.vs = q.get('vs');
-    S.sleep = nearest(OPTIONS.sleep, num('sleep', 0, 24, S.sleep));
-    S.work = nearest(OPTIONS.work, num('work', 0, 24, S.work));
-    S.days = nearest(OPTIONS.days, num('days', 0, 7, S.days));
-    S.commute = nearest(OPTIONS.commute, num('commute', 0, 24, S.commute));
-    S.retire = Math.round(num('retire', 30, 100, S.retire));
-    S.weeksOff = nearest(OPTIONS.weeksOff, num('off', 0, 52, S.weeksOff));
-    S.routine = list('day', M.ROUTINE.length, 0, 8, S.routine, M.ROUTINE[PHONE].h).map(v => nearest(OPTIONS.routine, v));
+    },
+  });
+
+  // One person's week, read from a link's answers onto a copy of `base`. Used for you and for comparisons.
+  const PROFILE = ['age', 'sex', 'country', 'sleep', 'work', 'days', 'commute', 'retire', 'weeksOff', 'routine', 'mine'];
+  const profileOf = s => Object.fromEntries(PROFILE.map(k => [k, Array.isArray(s[k]) ? [...s[k]] : s[k]]));
+  function profileFrom(q, base) {
+    const { num, list } = readers(q), p = profileOf(base);
+    p.age = Math.round(num('age', 10, 100, p.age));
+    if (['b', 'f', 'm'].includes(q.get('sex'))) p.sex = q.get('sex');
+    if (Object.hasOwn(T.places, q.get('in') || '')) p.country = q.get('in');
+    p.sleep = nearest(OPTIONS.sleep, num('sleep', 0, 24, p.sleep));
+    p.work = nearest(OPTIONS.work, num('work', 0, 24, p.work));
+    p.days = nearest(OPTIONS.days, num('days', 0, 7, p.days));
+    p.commute = nearest(OPTIONS.commute, num('commute', 0, 24, p.commute));
+    p.retire = Math.round(num('retire', 30, 100, p.retire));
+    p.weeksOff = nearest(OPTIONS.weeksOff, num('off', 0, 52, p.weeksOff));
+    p.routine = list('day', M.ROUTINE.length, 0, 8, p.routine, M.ROUTINE[PHONE].h).map(v => nearest(OPTIONS.routine, v));
     const mine = q.get('mine') || '';
     if (/^[01]+$/.test(mine)) {
       const flags = fill([...mine].map(c => c === '1'), M.ROUTINE.length, true);
-      if (flags.length === M.ROUTINE.length) S.mine = flags;
+      if (flags.length === M.ROUTINE.length) p.mine = flags;
     }
+    return p;
+  }
+  const profileParams = p => ({
+    age: p.age, sex: p.sex, in: p.country, sleep: p.sleep, work: p.work, days: p.days,
+    commute: +p.commute.toFixed(3), retire: p.retire, off: p.weeksOff, day: p.routine.join(','), mine: p.mine.map(Number).join(''),
+  });
+
+  function readHash(hash) {
+    const q = new URLSearchParams(hash.replace(/^#/, ''));
+    if (!q.has('age')) return false;
+    const { num, list } = readers(q);
+    Object.assign(S, profileFrom(q, S));
+    if (Object.hasOwn(T.places, q.get('vs') || '')) S.vs = q.get('vs');
     const shares = list('split', CATS.length, 0, 100, null, 0);
     if (shares && sum(shares) > 0) S.shares = shares.map(x => (x / sum(shares)) * 100);
     S.units = list('as', CATS.length, 0, 9, S.units, 0).map((u, i) => (Number.isInteger(u) && u < CATS[i].units.length ? u : 0));
@@ -125,14 +144,14 @@
       const [name, age, sex, visits] = p.split('~');
       return { name: clean(name, 20), age: Math.round(M.clamp(Number(age) || 0, 0, 100)), sex: ['b', 'f', 'm'].includes(sex) ? sex : 'b', visits: Math.round(M.clamp(Number(visits) || 0, 0, 365)) };
     });
+    const other = new URLSearchParams(q.get('other') || '');
+    if (other.has('age')) S.other = { ...profileFrom(other, M.DEFAULTS), name: clean(other.get('name'), 20) || 'Them' };
     return true;
   }
 
   function hashNow() {
     const q = new URLSearchParams({
-      age: S.age, sex: S.sex, in: S.country, sleep: S.sleep, work: S.work, days: S.days,
-      commute: +S.commute.toFixed(3), retire: S.retire, off: S.weeksOff,
-      day: S.routine.join(','), mine: S.mine.map(Number).join(''),
+      ...profileParams(S),
       split: S.shares.map(x => +x.toFixed(1)).join(','), as: S.units.join(','), focus: S.focus,
       wpm: S.wpm, words: S.words, often: S.fq.join(','), vs: S.vs,
     });
@@ -140,6 +159,7 @@
     if (S.dob) q.set('dob', S.dob);
     q.set('custom', `${clean(S.custom.label, 24)}~${clean(S.custom.unit, 24)}~${S.custom.h}`);
     if (S.people.length) q.set('people', S.people.map(p => `${clean(p.name, 20)}~${p.age}~${p.sex}~${p.visits}`).join(';'));
+    if (S.other) q.set('other', new URLSearchParams({ name: clean(S.other.name, 20), ...profileParams(S.other) }).toString());
     try {
       history.replaceState(null, '', `#${q}`);
       localStorage.setItem('game-of-life', `#${q}`);
@@ -211,7 +231,7 @@
 
   /* The numbers */
 
-  let F = null, YEARS = 0, B = null, ROWS = [], HEALTHY = null;
+  let F = null, YEARS = 0, B = null, ROWS = [], HEALTHY = null, RANGE = [0, 0], O = null;
   function compute() {
     const dob = birthday();
     if (dob) S.age = M.ageOn(dob, new Date());
@@ -220,6 +240,13 @@
     B = M.budget(S, YEARS);
     ROWS = M.yearRows(S, B);
     HEALTHY = M.healthyYears(T, S.country, S.sex, S.age, YEARS);
+    // Free hours if you live as long as the lower and the upper quartile of people your age.
+    RANGE = [M.budget(S, F.q1).h.free, M.budget(S, F.q3).h.free];
+    O = null;
+    if (S.other) {
+      const p = S.other, f = M.lifeFacts(T, p.country, p.sex, p.age, S.cohort), b = M.budget(p, f.years);
+      O = { p, F: f, B: b, ROWS: M.yearRows(p, b) };
+    }
   }
 
   const labelOf = i => (i === CUSTOM ? S.custom.label : CATS[i].label);
@@ -277,6 +304,8 @@
 
   const KINDS = ['sleep', 'work', 'commute', 'admin', 'yours'];
   const KIND_NAMES = ['asleep', 'of work', 'commuting', 'on upkeep', 'that are yours'];
+  const DAY_NAMES = ['asleep', 'of work', 'commuting', 'on upkeep', 'yours'];
+  const KIND_WORDS = ['sleep', 'work', 'commuting', 'upkeep'];
   const GUTTER = 30;
   const snap = p => { const d = Math.min(devicePixelRatio || 1, 2); return Math.max(1 / d, Math.floor(p * d) / d); };
   const size = p => Math.max(0.5, p - Math.max(1, p * 0.18));
@@ -314,10 +343,10 @@
     const rows = S.age + tail;
     const p = snap(Math.min((W - GUTTER) / 52, H / rows)), s = size(p);
     const ox = Math.round((W - GUTTER - 52 * p) / 2) + GUTTER, oy = Math.round((H - rows * p) / 2);
-    const cells = [];
+    const cells = [], born = birthday()?.getFullYear();
     for (let i = 0; i < lived; i++) {
       const y = Math.floor(i / 52);
-      cells.push({ k: `l${i}`, x: ox + (i % 52) * p, y: oy + y * p, s, c: C.lived, d: (y / rows) * 500, group: y, info: { value: `Age ${y}`, label: 'Already lived' } });
+      cells.push({ k: `l${i}`, x: ox + (i % 52) * p, y: oy + y * p, s, c: C.lived, d: (y / rows) * 500, group: y, info: { value: born ? `${born + y}, age ${y}` : `Age ${y}`, label: 'Already lived' } });
     }
     const future = (tail * 52) - (lived - S.age * 52);
     for (let j = 0; j < future; j++) {
@@ -333,6 +362,7 @@
   }
 
   function sceneAhead(W, H) {
+    if (O) return sceneCompare(W, H);
     const rows = ROWS.length;
     const p = snap(Math.min((W - GUTTER) / 52, H / rows)), s = size(p);
     const ox = Math.round((W - GUTTER - 52 * p) / 2) + GUTTER, oy = Math.round((H - rows * p) / 2);
@@ -356,6 +386,61 @@
     return { cells, labels: ageTicks(S.age, S.age + rows, yOf, ox - 8, marks) };
   }
 
+  // Two lives side by side, one row per year from now, each sorted by what fills it.
+  function sceneCompare(W, H) {
+    const SPLIT = 26, LABEL = 24, half = (W - SPLIT) / 2, rows = Math.max(ROWS.length, O.ROWS.length);
+    const p = snap(Math.min((half - GUTTER) / 52, (H - LABEL) / rows)), s = size(p);
+    const oy = LABEL + Math.round((H - LABEL - rows * p) / 2), cells = [], labels = [];
+    const grid = (key, x0, name, age, facts, budget, yearRows) => {
+      const ox = x0 + GUTTER, totals = [budget.h.sleep, budget.h.work, budget.h.commute, budget.h.admin, budget.h.free].map(h => years(h / M.YEAR_H));
+      labels.push({ k: `${key}name`, text: `${name} · ${totals[4]} yours`, x: ox, y: oy - 12, font: `600 12px ${C.body}`, color: rgb(C.ink) });
+      let j = 0;
+      yearRows.forEach((counts, y) => {
+        let col = 0;
+        counts.forEach((n, kind) => {
+          for (let i = 0; i < n; i++, j++, col++) {
+            cells.push({
+              k: `${key}${j}`, x: ox + col * p, y: oy + y * p, s, c: C[KINDS[kind]], a: 0.35 + 0.65 * M.survivalAt(facts, y),
+              d: col * 5 + (y / rows) * 250, group: kind,
+              info: { value: `${totals[kind]} ${KIND_NAMES[kind]}`, label: `${name}, at ${age + y}: ${counts[kind]} of that year’s ${sum(counts)} weeks` },
+            });
+          }
+        });
+      });
+      const yOf = a => oy + (a - age) * p + p / 2;
+      for (const l of ageTicks(age, age + yearRows.length, yOf, ox - 8, [{ k: 'now', text: String(age), age, color: rgb(C.ink) }])) labels.push({ ...l, k: `${key}${l.k}` });
+    };
+    grid('a', 0, 'You', S.age, F, B, ROWS);
+    grid('o', half + SPLIT, O.p.name, O.p.age, O.F, O.B, O.ROWS);
+    return { cells, labels };
+  }
+
+  // A workday and a day off in 15-minute squares, one column per hour.
+  function sceneDay(W, H) {
+    const parts = M.dayParts(S, B), working = B.workYears > 0 && S.work > 0 && S.days > 0;
+    const days = working ? [['A workday', parts.workday, 'w'], ['A day off', parts.off, 'f']] : [['A day', parts.off, 'f']];
+    const LABEL = 24, GAP = 20;
+    const p = snap(Math.min(W / 24, (H - days.length * LABEL - (days.length - 1) * GAP) / (days.length * 4), 34)), s = size(p);
+    const height = days.length * (LABEL + 4 * p) + (days.length - 1) * GAP, ox = Math.round((W - 24 * p) / 2);
+    let y = Math.round((H - height) / 2);
+    const cells = [], labels = [];
+    for (const [title, hours, key] of days) {
+      labels.push({ k: `day${key}`, text: `${title} · ${duration(hours[4])} yours`, x: ox, y: y + LABEL / 2, font: `600 12px ${C.body}`, color: rgb(C.ink) });
+      y += LABEL;
+      let q = 0;
+      M.apportion(hours, 96).forEach((n, kind) => {
+        for (let i = 0; i < n; i++, q++) {
+          cells.push({
+            k: `d${key}${q}`, x: ox + Math.floor(q / 4) * p, y: y + (q % 4) * p, s, c: C[KINDS[kind]], d: q * 5, group: `${key}${kind}`,
+            info: { value: `${duration(hours[kind])} ${DAY_NAMES[kind]}`, label: `on ${title.toLowerCase()}, one square per 15 minutes` },
+          });
+        }
+      });
+      y += 4 * p + GAP;
+    }
+    return { cells, labels };
+  }
+
   const freeWeeks = () => weeksAhead().map((w, j) => ({ ...w, j })).filter(w => w.kind === 4);
   const kindHours = () => [B.h.sleep, B.h.work, B.h.commute, B.h.admin, B.h.free];
 
@@ -375,7 +460,7 @@
     const p = snap(raw), s = size(p), rows = Math.ceil(F2.length / cols);
     const ox = Math.round((W - cols * p) / 2), oy = Math.round((H - rows * p) / 2);
     const cells = F2.map((w, i) => ({
-      k: `a${w.j}`, x: ox + (i % cols) * p, y: oy + Math.floor(i / cols) * p, s, c: C.yours,
+      k: `a${w.j}`, x: ox + (i % cols) * p, y: oy + Math.floor(i / cols) * p, s, c: C.yours, a: 0.35 + 0.65 * M.survivalAt(F, w.y),
       d: (i / F2.length) * 400, group: w.y,
       info: { value: `Week ${int(i + 1)} of ${int(F2.length)}`, label: `yours, around age ${S.age + w.y}` },
     }));
@@ -402,7 +487,7 @@
       labels.push({ k: `g${g.i}`, text: `${labelOf(g.i)} · ${whole[g.i]}%`, x: ox, y: y + LABEL / 2, font: `${on ? 600 : 500} 12px ${C.body}`, color: rgb(on ? C.accentInk : C.muted) });
       y += LABEL;
       for (let m = 0; m < g.n; m++, k++) {
-        cells.push({ k: `a${F2[k].j}`, x: ox + (m % cols) * p, y: y + Math.floor(m / cols) * p, s, c: on ? C.yours : C.yours2, d: (k / F2.length) * 350, cat: g.i, group: g.i, info });
+        cells.push({ k: `a${F2[k].j}`, x: ox + (m % cols) * p, y: y + Math.floor(m / cols) * p, s, c: on ? C.yours : C.yours2, a: 0.35 + 0.65 * M.survivalAt(F, F2[k].y), d: (k / F2.length) * 350, cat: g.i, group: g.i, info });
       }
       y += Math.ceil(g.n / cols) * p;
     }
@@ -420,20 +505,21 @@
     const cells = [], ageAt = ageAtShare();
     for (let u = 0; u < m; u++) {
       const par = parents[Math.floor((u * parents.length) / m)] || { x: W / 2, y: H / 2, s: 0 };
+      const age = ageAt((u + 0.5) / m);
       cells.push({
-        k: `u${u}`, x: ox + (u % cols) * p, y: oy + Math.floor(u / cols) * p, s, c: C.yours,
+        k: `u${u}`, x: ox + (u % cols) * p, y: oy + Math.floor(u / cols) * p, s, c: C.yours, a: 0.35 + 0.65 * M.survivalAt(F, age - S.age),
         d: (u / m) * 600, from: { x: par.x + par.s / 2, y: par.y + par.s / 2, s: 0 },
         info: {
           value: k === 1 ? `${cap(unit.one)} ${int(u + 1)} of ${int(m)}` : `${cap(unit.many)} ${int(u * k + 1)} to ${int((u + 1) * k)}`,
-          label: `around age ${ageAt((u + 0.5) / m)}, at this pace`,
+          label: `around age ${age}, at this pace`,
         },
       });
     }
     return { cells, labels: [] };
   }
 
-  const LEVELS = ['life', 'ahead', 'yours', 'plans', 'units'];
-  const SCENES = { life: sceneLife, ahead: sceneAhead, yours: sceneYours, plans: scenePlans, units: sceneUnits };
+  const LEVELS = ['life', 'ahead', 'day', 'yours', 'plans', 'units'];
+  const SCENES = { life: sceneLife, ahead: sceneAhead, day: sceneDay, yours: sceneYours, plans: scenePlans, units: sceneUnits };
   const stage = createCells($('#stage'));
   let level = null, intro = 0;
 
@@ -443,7 +529,8 @@
     const info = unitInfo(S.focus);
     return {
       life: `${int(livedWeeks())} weeks lived and about ${int(sum(weeks))} ahead, one square per week, paler where fewer people your age are still alive.`,
-      ahead: `Weeks ahead: ${int(weeks[0])} asleep, ${int(weeks[1])} working, ${int(weeks[2])} commuting, ${int(weeks[3])} on upkeep, ${int(weeks[4])} yours.`,
+      ahead: `Weeks ahead: ${int(weeks[0])} asleep, ${int(weeks[1])} working, ${int(weeks[2])} commuting, ${int(weeks[3])} on upkeep, ${int(weeks[4])} yours.${O ? ` Next to them, ${O.p.name}’s weeks.` : ''}`,
+      day: `A day in 15-minute squares, one column per hour.`,
       yours: `${int(weeks[4])} weeks that are yours.`,
       plans: `Your weeks, split: ${CATS.map((c, i) => `${labelOf(i)} ${shown()[i]}%`).join(', ')}.`,
       units: `About ${amount(info.hours, info.unit)}, ${pace(info.n)}.`,
@@ -524,12 +611,16 @@
           showTip(e.clientX, e.clientY, `${int(YEARS * M.YEAR_H)} hours`, `ahead, on average. Half of people your age live past ${int(S.age + F.median)}, a quarter past ${int(S.age + F.q3)}.`);
           return;
         }
-        const h = kindHours()[kind];
-        showTip(e.clientX, e.clientY, `${int(h)} hours`, `${pct((h / B.h.total) * 100)} of the time you have left`);
+        const h = kindHours()[kind], share = `${pct((h / B.h.total) * 100)} of the time you have left`;
+        showTip(e.clientX, e.clientY, `${int(h)} hours`, kind === '4' ? `${share}. Middle half of people like you: ${rough(RANGE[0])} to ${rough(RANGE[1])}.` : share);
         if (level === 'ahead') stage.setHover({ group: Number(kind) });
       });
       row.addEventListener('pointerleave', () => { hideTip(); if (level === 'ahead') stage.setHover(null); });
     }
+
+    const figure = $('.figure');
+    figure.addEventListener('pointermove', e => showTip(e.clientX, e.clientY, `${rough(RANGE[0])} to ${rough(RANGE[1])} hours`, 'for the middle half of people like you, depending on how long you live'));
+    figure.addEventListener('pointerleave', hideTip);
 
     const HINTS = {
       weekends: () => ['52 a year', `for the ${one(YEARS)} years you likely have`],
@@ -582,16 +673,29 @@
 
   function renderCaptions() {
     const healthy = HEALTHY === null ? '' : ` About ${int(HEALTHY)} of them in good health, roughly.`;
-    set('capLife', `Each square is a week, and the faded ones are behind you. ${cap(who())} can expect about ${one(YEARS)} more years${S.cohort ? ' if death rates keep falling' : ''}.${healthy}${milestone()}`);
-    set('capOdds', `Paler squares are less likely: half of people your age live past ${int(S.age + F.median)}, a quarter past ${int(S.age + F.q3)}.`);
+    const PEOPLE = { b: 'people', f: 'women', m: 'men' };
+    set('capLife', `Half of ${PEOPLE[S.sex]} your age ${inPlace(S.country)} live past ${int(S.age + F.median)}, and a quarter past ${int(S.age + F.q3)}${S.cohort ? ' if death rates keep falling' : ''}. On average that’s ${one(YEARS)} more years, about ${int(sum(ROWS.map(sum)))} weeks.${healthy}${milestone()}`);
+    set('capOdds', 'Each square is a week. Faded ones are behind you; paler ones ahead are weeks fewer people live to see.');
     const other = M.lifeFacts(T, S.vs, S.sex, S.age, S.cohort).years, diff = other - YEARS;
     set('compareYears', `${years(other)}${S.vs === S.country ? '' : ` (${diff >= 0 ? '+' : ''}${one(diff)})`}`);
     const widens = B.workYears > 0 && B.workYears < YEARS ? `, and it widens once you stop working at ${S.retire}` : '';
-    set('capAhead', `Each row is a year from now. Gray goes to sleep, work, commuting and upkeep; orange is yours${widens}. Later rows fade with the odds of living them.`);
+    if (O) {
+      const mine = [B.h.sleep, B.h.work, B.h.commute, B.h.admin], theirs = [O.B.h.sleep, O.B.h.work, O.B.h.commute, O.B.h.admin];
+      const k = mine.map((h, i) => Math.abs(h - theirs[i])).reduce((best, d, i, all) => (d > all[best] ? i : best), 0);
+      const name = O.p.name;
+      set('capAhead', `You have ${years(B.h.free / M.YEAR_H)} that are yours; ${name} has ${years(O.B.h.free / M.YEAR_H)}. The biggest difference is ${KIND_WORDS[k]}: ${years(mine[k] / M.YEAR_H)} for you, ${years(theirs[k] / M.YEAR_H)} for ${name}. Hover a square to light up the same kind of time in both.`);
+    } else {
+      set('capAhead', `Each row is a year from now. Gray goes to sleep, work, commuting and upkeep; orange is yours${widens}. Later rows fade with the odds of living them.`);
+    }
+    set('compareLink', O ? 'Change the comparison' : 'Compare with someone');
+    const day = M.dayParts(S, B), [sl, wk, cm, up, yo] = day.workday;
+    set('capDay', B.workYears > 0 && S.work > 0 && S.days > 0
+      ? `A workday in 15-minute squares, one column per hour: ${duration(sl)} asleep, ${duration(wk)} of work, ${duration(cm)} commuting, ${duration(up)} on upkeep, and ${duration(yo)} yours. A day off leaves ${duration(day.off[4])} yours.`
+      : `A day in 15-minute squares, one column per hour: ${duration(day.off[0])} asleep, ${duration(day.off[3])} on upkeep, and ${duration(day.off[4])} yours.`);
     set('capWeekly', B.weekly.now === null
       ? `About ${int(B.weekly.later)} hours a week are yours.`
       : `Right now about ${int(B.weekly.now)} hours a week are yours. After ${S.retire}, about ${int(B.weekly.later)}.`);
-    set('capYours', `Only your weeks remain: ${int(B.h.free)} hours, about ${one(B.h.free / M.YEAR_H)} full years to spend as you choose.`);
+    set('capYours', `Only your weeks remain: ${int(B.h.free)} hours, about ${one(B.h.free / M.YEAR_H)} full years. Depending on how long you live, the middle half of people like you get ${rough(RANGE[0])} to ${rough(RANGE[1])}.`);
     const phone = S.routine[PHONE];
     set('capPhone', phone > 0
       ? `At ${duration(phone)} a day on your phone, that’s about ${one((phone * M.DAYS * YEARS) / M.YEAR_H)} full years${S.mine[PHONE] ? ' of this time' : ''}. Fine-tune your day to change it.`
@@ -677,6 +781,75 @@
     const cohort = $('#cohort');
     cohort.checked = S.cohort;
     cohort.addEventListener('change', () => { S.cohort = cohort.checked; update(); });
+
+    $('#retireRange').addEventListener('input', e => { S.retire = Number(e.target.value); stopIntro(); update(); });
+  }
+
+  /* Compare two lives */
+
+  let otherBase = null; // routine, time off and the rest carried over from a pasted link
+
+  function fillCompare(p) {
+    otherBase = p;
+    $('#oName').value = p.name || '';
+    $('#oAge').value = String(p.age);
+    $('#oArticle').textContent = article(p.age);
+    $('#oSex').value = p.sex;
+    $('#oCountry').value = p.country;
+    $('#oSleep').value = String(nearest(OPTIONS.sleep, p.sleep));
+    $('#oWork').value = String(nearest(OPTIONS.work, p.work));
+    $('#oDays').value = String(nearest(OPTIONS.days, p.days));
+    $('#oCommute').value = String(nearest(OPTIONS.commute, p.commute));
+    $('#oRetire').value = String(p.retire);
+    $$('#lives .field:not(.field--text)').forEach(fit);
+  }
+
+  function readCompare() {
+    return {
+      ...otherBase,
+      name: clean($('#oName').value, 20) || 'Them',
+      age: Math.round(M.clamp(Number($('#oAge').value) || otherBase.age, 10, 100)),
+      sex: $('#oSex').value,
+      country: $('#oCountry').value,
+      sleep: Number($('#oSleep').value),
+      work: Number($('#oWork').value),
+      days: Number($('#oDays').value),
+      commute: Number($('#oCommute').value),
+      retire: Math.round(M.clamp(Number($('#oRetire').value) || otherBase.retire, 30, 100)),
+    };
+  }
+
+  function buildCompare() {
+    countryOptions($('#oCountry'));
+    options($('#oSleep'), OPTIONS.sleep, h => duration(h));
+    options($('#oWork'), OPTIONS.work, h => (h === 0 ? '0 hours' : duration(h)));
+    options($('#oDays'), OPTIONS.days, d => plural(d, 'day'));
+    options($('#oCommute'), OPTIONS.commute, h => duration(h));
+    const note = msg => { $('#compareStatus').textContent = msg; };
+    $('#otherLink').addEventListener('input', e => {
+      const v = e.target.value.trim(), i = v.indexOf('#'), q = new URLSearchParams(i >= 0 ? v.slice(i + 1) : v);
+      if (!q.has('age')) { note(v ? 'That link has no answers in it yet.' : ''); return; }
+      fillCompare({ ...profileFrom(q, readCompare()), name: $('#oName').value });
+      note('Filled in from the link. Add a name, then compare.');
+    });
+    for (const el of $$('#lives .field')) {
+      el.addEventListener('input', () => {
+        if (el.id === 'oAge') $('#oArticle').textContent = article(Number(el.value) || 0);
+        if (!el.classList.contains('field--text')) fit(el);
+      });
+    }
+    $('#compareGo').addEventListener('click', () => {
+      S.other = readCompare();
+      $('#lives').close();
+      stopIntro();
+      update();
+      setLevel('ahead');
+    });
+    $('#compareStop').addEventListener('click', () => {
+      S.other = null;
+      $('#lives').close();
+      update();
+    });
   }
 
   const ARROW = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -723,6 +896,11 @@
     age.readOnly = !!dob;
     age.title = dob ? 'From your birthday. Clear it in Fine-tune my day to type an age.' : '';
     if (dob) age.value = String(S.age);
+    const scrub = $('#retireRange'), retire = $('#retire');
+    scrub.value = String(S.retire);
+    scrub.style.setProperty('--p', ((S.retire - 30) / 60) * 100);
+    $('#retireOut').textContent = String(S.retire);
+    if (document.activeElement !== retire) retire.value = String(S.retire);
     fitAll();
   }
 
@@ -1070,6 +1248,12 @@
       if (opener) {
         const dialog = $(`#${opener.dataset.open}`);
         if (dialog.id === 'method') renderTables();
+        if (dialog.id === 'lives') {
+          fillCompare(S.other || { ...profileOf(S), name: '' });
+          $('#otherLink').value = '';
+          $('#compareStatus').textContent = '';
+          $('#compareStop').hidden = !S.other;
+        }
         hideTip();
         dialog.showModal();
         fitAll();
@@ -1137,6 +1321,7 @@
     buildDialogs();
     buildLevels();
     buildHover();
+    buildCompare();
     renderPeople();
     renderFocus();
     update();
