@@ -53,12 +53,12 @@
           <p class="result__line">are yours: about <b data-k="freeYears"></b> full years, <b data-k="freePct"></b> of the time you have left.</p>
         </div>
         <dl class="legend">
-          <div class="legend__head"><dt>Years ahead</dt><dd data-k="years"></dd></div>
-          <div><dt><i class="sw sw--sleep"></i>Sleep</dt><dd data-k="ySleep"></dd></div>
-          <div><dt><i class="sw sw--work"></i>Work</dt><dd data-k="yWork"></dd></div>
-          <div><dt><i class="sw sw--commute"></i>Commuting</dt><dd data-k="yCommute"></dd></div>
-          <div><dt><i class="sw sw--admin"></i>Upkeep</dt><dd data-k="yAdmin"></dd></div>
-          <div class="legend__yours"><dt><i class="sw sw--yours"></i>Yours</dt><dd data-k="yFree"></dd></div>
+          <div class="legend__head" data-kind="all"><dt>Years ahead</dt><dd data-k="years"></dd></div>
+          <div data-kind="0"><dt><i class="sw sw--sleep"></i>Sleep</dt><dd data-k="ySleep"></dd></div>
+          <div data-kind="1"><dt><i class="sw sw--work"></i>Work</dt><dd data-k="yWork"></dd></div>
+          <div data-kind="2"><dt><i class="sw sw--commute"></i>Commuting</dt><dd data-k="yCommute"></dd></div>
+          <div data-kind="3"><dt><i class="sw sw--admin"></i>Upkeep</dt><dd data-k="yAdmin"></dd></div>
+          <div class="legend__yours" data-kind="4"><dt><i class="sw sw--yours"></i>Yours</dt><dd data-k="yFree"></dd></div>
         </dl>
       </section>
 
@@ -73,7 +73,6 @@
         </div>
         <div class="stage">
           <canvas id="stage" role="img" aria-label="A grid of squares, one for each week of your life"></canvas>
-          <p class="tip" id="tip" aria-hidden="true"></p>
         </div>
         <div class="captions" aria-live="polite">
           <div class="caption" data-level="life">
@@ -133,6 +132,8 @@
       </section>
     </footer>
   </div>
+
+  <div class="tooltip" id="tooltip" role="tooltip" aria-hidden="true"><b></b><span></span></div>
 
   <dialog class="sheet" id="tune" aria-labelledby="tune-h">
     <div class="sheet__body">

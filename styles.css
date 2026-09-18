@@ -305,7 +305,8 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 .result__line { color: var(--color-muted); font-size: var(--text-sm); }
 
 .legend { display: grid; gap: 0.1rem; font-size: var(--text-sm); }
-.legend > div { display: flex; align-items: center; gap: var(--space-xs); }
+.legend > div { display: flex; align-items: center; gap: var(--space-xs); margin-inline: -0.3rem; padding-inline: 0.3rem; border-radius: 4px; transition: background-color var(--dur-micro) var(--ease-out); }
+.legend > div:hover { background: var(--color-paper-2); }
 .legend dt { display: flex; align-items: center; gap: 0.45rem; }
 .legend dd { margin-left: auto; font-variant-numeric: tabular-nums; }
 .legend__head { font-weight: 600; }
@@ -350,21 +351,31 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 .stage { position: relative; height: 62vh; min-height: 16rem; }
 .stage canvas { display: block; width: 100%; height: 100%; }
 
-.tip {
-  position: absolute;
+/* One tooltip for every chart: the value leads, the label follows. */
+.tooltip {
+  position: fixed;
   left: 0;
-  bottom: 0;
-  padding: 0.2rem 0.5rem;
+  top: 0;
+  z-index: 600;
+  display: grid;
+  gap: 0.1rem;
+  max-width: 17rem;
+  padding: 0.45rem 0.65rem;
   background: var(--color-paper);
+  color: var(--color-ink);
   border: 1px solid var(--color-rule);
-  border-radius: 6px;
-  font-size: var(--text-xs);
+  border-radius: 8px;
+  box-shadow: var(--shadow-whisper);
+  font-size: var(--text-sm);
+  line-height: 1.35;
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--dur-micro) var(--ease-out);
 }
 
-.tip.is-on { opacity: 1; }
+.tooltip.is-on { opacity: 1; }
+.tooltip b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.tooltip span { color: var(--color-muted); }
 
 .captions { max-width: 46rem; }
 .caption { display: grid; gap: 0.3rem; }
@@ -400,15 +411,18 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 .bar { display: flex; gap: 2px; height: 0.55rem; flex: none; }
 
 .bar span {
+  position: relative;
   flex: var(--g, 1) 1 0;
   min-width: 0;
+  cursor: pointer;
   background: var(--color-accent);
   border-radius: 2px;
   opacity: 0.45;
   transition: flex-grow var(--dur-long) var(--ease-out), opacity var(--dur-short) var(--ease-out);
 }
 
-.bar span.is-on { opacity: 1; }
+.bar span.is-on, .bar span.is-hover { opacity: 1; }
+.bar span::before { content: ""; position: absolute; inset: -0.6rem -1px; }
 .bar.is-dragging span { transition: opacity var(--dur-short) var(--ease-out); }
 
 .alloc { list-style: none; padding: 0; display: grid; gap: 1px; }
@@ -427,7 +441,7 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
   transition: background-color var(--dur-short) var(--ease-out);
 }
 
-.row:hover, .row.is-focus { background: var(--color-paper-2); }
+.row:hover, .row.is-hover, .row.is-focus { background: var(--color-paper-2); }
 
 .row__name {
   grid-area: name;
@@ -474,6 +488,7 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 
 .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-sm); }
 .tiles > div { display: flex; flex-direction: column-reverse; }
+.tiles > div:hover dd { color: var(--color-accent-ink); }
 .tiles dd { font-family: var(--font-display); font-size: clamp(1.3rem, 0.8rem + 1.2vh, 1.9rem); line-height: 1; font-variant-numeric: tabular-nums; }
 .tiles dt { color: var(--color-muted); font-size: var(--text-xs); }
 

@@ -276,7 +276,7 @@
   /* Stage scenes: one square per week, zooming from a whole life down to single books */
 
   const KINDS = ['sleep', 'work', 'commute', 'admin', 'yours'];
-  const KIND_NAMES = ['sleep', 'work', 'commuting', 'upkeep', 'yours'];
+  const KIND_NAMES = ['asleep', 'of work', 'commuting', 'on upkeep', 'that are yours'];
   const GUTTER = 30;
   const snap = p => { const d = Math.min(devicePixelRatio || 1, 2); return Math.max(1 / d, Math.floor(p * d) / d); };
   const size = p => Math.max(0.5, p - Math.max(1, p * 0.18));
@@ -317,12 +317,15 @@
     const cells = [];
     for (let i = 0; i < lived; i++) {
       const y = Math.floor(i / 52);
-      cells.push({ k: `l${i}`, x: ox + (i % 52) * p, y: oy + y * p, s, c: C.lived, d: (y / rows) * 500, tip: `Age ${y}: lived` });
+      cells.push({ k: `l${i}`, x: ox + (i % 52) * p, y: oy + y * p, s, c: C.lived, d: (y / rows) * 500, group: y, info: { value: `Age ${y}`, label: 'Already lived' } });
     }
     const future = (tail * 52) - (lived - S.age * 52);
     for (let j = 0; j < future; j++) {
       const g = lived + j, y = Math.floor(g / 52), t = j / 52, alive = M.survivalAt(F, t);
-      const cell = { x: ox + (g % 52) * p, y: oy + y * p, s, c: C.ahead, a: Math.max(0.06, alive), d: (y / rows) * 500, tip: `Age ${y}: ${pct(alive * 100)} of people your age are still here` };
+      const cell = {
+        x: ox + (g % 52) * p, y: oy + y * p, s, c: C.ahead, a: Math.max(0.06, alive), d: (y / rows) * 500,
+        group: y, info: { value: pct(alive * 100), label: `of people your age are still alive at ${y}` },
+      };
       cells.push(j < ahead.length ? { k: `a${j}`, ...cell } : { k: `x${j}`, ...cell });
     }
     const yOf = a => oy + a * p + p / 2;
@@ -338,11 +341,13 @@
       const y = Math.floor(i / 52) - S.age;
       cells.push({ k: `l${i}`, x: ox + (i % 52) * p, y: oy + y * p, s, c: C.lived, a: 0 });
     }
+    const totals = kindHours().map(h => years(h / M.YEAR_H));
     weeksAhead().forEach((w, j) => {
       const alive = M.survivalAt(F, w.y);
       cells.push({
         k: `a${j}`, x: ox + w.col * p, y: oy + w.y * p, s, c: C[KINDS[w.kind]], a: 0.35 + 0.65 * alive,
-        d: w.col * 5 + (w.y / rows) * 250, tip: `Age ${S.age + w.y}: ${KIND_NAMES[w.kind]}`,
+        d: w.col * 5 + (w.y / rows) * 250, group: w.kind,
+        info: { value: `${totals[w.kind]} ${KIND_NAMES[w.kind]}`, label: `At ${S.age + w.y}: ${ROWS[w.y][w.kind]} of that year’s ${sum(ROWS[w.y])} weeks` },
       });
     });
     const yOf = a => oy + (a - S.age) * p + p / 2;
@@ -352,6 +357,17 @@
   }
 
   const freeWeeks = () => weeksAhead().map((w, j) => ({ ...w, j })).filter(w => w.kind === 4);
+  const kindHours = () => [B.h.sleep, B.h.work, B.h.commute, B.h.admin, B.h.free];
+
+  // The age by which a given share of your own time has been spent.
+  function ageAtShare() {
+    const free = ROWS.map(r => r[4]), total = Math.max(1, sum(free)), cum = [];
+    free.reduce((acc, n, y) => (cum[y] = acc + n), 0);
+    return share => {
+      const y = cum.findIndex(c => c >= share * total);
+      return S.age + (y < 0 ? free.length - 1 : y);
+    };
+  }
 
   function sceneYours(W, H) {
     const F2 = freeWeeks();
@@ -360,7 +376,8 @@
     const ox = Math.round((W - cols * p) / 2), oy = Math.round((H - rows * p) / 2);
     const cells = F2.map((w, i) => ({
       k: `a${w.j}`, x: ox + (i % cols) * p, y: oy + Math.floor(i / cols) * p, s, c: C.yours,
-      d: (i / F2.length) * 400, tip: `One of your ${int(F2.length)} own weeks, at age ${S.age + w.y}`,
+      d: (i / F2.length) * 400, group: w.y,
+      info: { value: `Week ${int(i + 1)} of ${int(F2.length)}`, label: `yours, around age ${S.age + w.y}` },
     }));
     return { cells, labels: [] };
   }
@@ -380,11 +397,12 @@
     let y = Math.round((H - height) / 2), k = 0;
     const cells = [], labels = [];
     for (const g of groups) {
-      const on = g.i === S.focus;
+      const on = g.i === S.focus, split = unitInfo(g.i);
+      const info = { value: `≈ ${amount(split.hours, split.unit)}`, label: `${labelOf(g.i)} · ${whole[g.i]}% · ${weekly(split, true)}. Click to zoom in.` };
       labels.push({ k: `g${g.i}`, text: `${labelOf(g.i)} · ${whole[g.i]}%`, x: ox, y: y + LABEL / 2, font: `${on ? 600 : 500} 12px ${C.body}`, color: rgb(on ? C.accentInk : C.muted) });
       y += LABEL;
       for (let m = 0; m < g.n; m++, k++) {
-        cells.push({ k: `a${F2[k].j}`, x: ox + (m % cols) * p, y: y + Math.floor(m / cols) * p, s, c: on ? C.yours : C.yours2, d: (k / F2.length) * 350, cat: g.i, tip: `${labelOf(g.i)}: one week` });
+        cells.push({ k: `a${F2[k].j}`, x: ox + (m % cols) * p, y: y + Math.floor(m / cols) * p, s, c: on ? C.yours : C.yours2, d: (k / F2.length) * 350, cat: g.i, group: g.i, info });
       }
       y += Math.ceil(g.n / cols) * p;
     }
@@ -394,18 +412,21 @@
   const STAGE_MAX = 3000;
   function sceneUnits(W, H) {
     const fi = S.focus, { unit, n } = unitInfo(fi);
-    const k = perSquare(n, STAGE_MAX), m = Math.floor(n / k);
+    const k = perSquare(n, STAGE_MAX), m = Math.round(n / k);
     const parents = scenePlans(W, H).cells.filter(c => c.cat === fi);
     const { cols, p: raw } = pack(m, W, H, 26);
     const p = snap(raw), s = size(p), rows = Math.ceil(m / cols);
     const ox = Math.round((W - cols * p) / 2), oy = Math.round((H - rows * p) / 2);
-    const cells = [];
+    const cells = [], ageAt = ageAtShare();
     for (let u = 0; u < m; u++) {
       const par = parents[Math.floor((u * parents.length) / m)] || { x: W / 2, y: H / 2, s: 0 };
       cells.push({
         k: `u${u}`, x: ox + (u % cols) * p, y: oy + Math.floor(u / cols) * p, s, c: C.yours,
         d: (u / m) * 600, from: { x: par.x + par.s / 2, y: par.y + par.s / 2, s: 0 },
-        tip: k === 1 ? `${cap(unit.one)} ${int(u + 1)} of ${int(m)}` : `${cap(unit.many)} ${int(u * k + 1)} to ${int((u + 1) * k)}`,
+        info: {
+          value: k === 1 ? `${cap(unit.one)} ${int(u + 1)} of ${int(m)}` : `${cap(unit.many)} ${int(u * k + 1)} to ${int((u + 1) * k)}`,
+          label: `around age ${ageAt((u + 0.5) / m)}, at this pace`,
+        },
       });
     }
     return { cells, labels: [] };
@@ -434,9 +455,9 @@
     level = next;
     for (const b of $$('.levels button')) b.setAttribute('aria-pressed', String(b.dataset.level === level));
     for (const c of $$('.caption')) c.hidden = c.dataset.level !== level;
+    clearGrid();
     stage.show(SCENES[level], true);
     $('#stage').setAttribute('aria-label', stageLabel());
-    hideTip();
   }
 
   let stageTimer = 0;
@@ -449,20 +470,79 @@
     }, 120);
   }
 
-  /* Hover details on the grid */
+  /* Hover: one tooltip for the grid, the split bar, the legend and the band */
 
-  const tip = $('#tip');
-  const hideTip = () => tip.classList.remove('is-on');
-  $('#stage').addEventListener('pointermove', e => {
-    const r = e.currentTarget.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-    const cell = stage.hit(x, y);
-    if (!cell || !cell.tip) return hideTip();
-    tip.textContent = cell.tip;
-    const w = tip.offsetWidth, h = tip.offsetHeight;
-    tip.style.transform = `translate(${Math.min(x + 12, r.width - w)}px, ${Math.max(0, y - h - 8)}px)`;
-    tip.classList.add('is-on');
+  const tooltip = $('#tooltip');
+  function showTip(x, y, value, label) {
+    tooltip.firstElementChild.textContent = value;
+    tooltip.lastElementChild.textContent = label;
+    tooltip.classList.add('is-on');
+    const w = tooltip.offsetWidth, h = tooltip.offsetHeight;
+    const left = x + 16 + w > innerWidth ? x - w - 12 : x + 16;
+    const top = y + 16 + h > innerHeight ? y - h - 12 : y + 16;
+    tooltip.style.transform = `translate(${Math.max(4, left)}px, ${Math.max(4, top)}px)`;
+  }
+  const hideTip = () => tooltip.classList.remove('is-on');
+
+  const canvas = $('#stage');
+  const cellAt = e => { const r = canvas.getBoundingClientRect(); return stage.hit(e.clientX - r.left, e.clientY - r.top); };
+  function clearGrid() {
+    stage.setHover(null);
+    hideTip();
+    canvas.style.cursor = '';
+    lightRow(-1);
+  }
+  function hoverGrid(e) {
+    const cell = cellAt(e);
+    if (!cell || !cell.info) return clearGrid();
+    stage.setHover({ group: cell.group, key: cell.k, stroke: rgb(C.ink) });
+    showTip(e.clientX, e.clientY, cell.info.value, cell.info.label);
+    canvas.style.cursor = level === 'plans' ? 'pointer' : 'default';
+    lightRow(level === 'plans' ? cell.group : -1);
+  }
+  canvas.addEventListener('pointermove', hoverGrid);
+  canvas.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') hoverGrid(e); });
+  canvas.addEventListener('pointerleave', clearGrid);
+  canvas.addEventListener('click', e => {
+    const cell = level === 'plans' && cellAt(e);
+    if (cell && cell.group !== undefined) { clearGrid(); focusRow(cell.group); }
   });
-  $('#stage').addEventListener('pointerleave', hideTip);
+
+  // Rows, bar segments and plan groups light up together.
+  function lightRow(i) {
+    R.forEach((r, j) => {
+      r.li.classList.toggle('is-hover', j === i);
+      r.span.classList.toggle('is-hover', j === i);
+    });
+  }
+
+  function buildHover() {
+    for (const row of $$('.legend [data-kind]')) {
+      const kind = row.dataset.kind;
+      row.addEventListener('pointermove', e => {
+        if (kind === 'all') {
+          showTip(e.clientX, e.clientY, `${int(YEARS * M.YEAR_H)} hours`, `ahead, on average. Half of people your age live past ${int(S.age + F.median)}, a quarter past ${int(S.age + F.q3)}.`);
+          return;
+        }
+        const h = kindHours()[kind];
+        showTip(e.clientX, e.clientY, `${int(h)} hours`, `${pct((h / B.h.total) * 100)} of the time you have left`);
+        if (level === 'ahead') stage.setHover({ group: Number(kind) });
+      });
+      row.addEventListener('pointerleave', () => { hideTip(); if (level === 'ahead') stage.setHover(null); });
+    }
+
+    const HINTS = {
+      weekends: () => ['52 a year', `for the ${one(YEARS)} years you likely have`],
+      summers: () => ['One a year', `for the ${one(YEARS)} years you likely have`],
+      moons: () => ['About 12.4 a year', `for the ${one(YEARS)} years you likely have`],
+      sunsets: () => ['One a day', `for the ${one(YEARS)} years you likely have`],
+    };
+    for (const [key, hint] of Object.entries(HINTS)) {
+      const tile = $(`[data-k="${key}"]`).parentElement;
+      tile.addEventListener('pointermove', e => showTip(e.clientX, e.clientY, ...hint()));
+      tile.addEventListener('pointerleave', hideTip);
+    }
+  }
 
   /* Number tweens */
 
@@ -673,6 +753,16 @@
       });
       r.range.addEventListener('change', () => bar.classList.remove('is-dragging'));
       li.addEventListener('click', e => { if (!e.target.closest('input')) focusRow(i); });
+      const emphasize = on => { lightRow(on ? i : -1); if (level === 'plans') stage.setHover(on ? { group: i } : null); };
+      li.addEventListener('pointerenter', () => emphasize(true));
+      li.addEventListener('pointerleave', () => emphasize(false));
+      span.addEventListener('pointermove', e => {
+        const info = unitInfo(i);
+        showTip(e.clientX, e.clientY, `≈ ${amount(info.hours, info.unit)}`, `${labelOf(i)} · ${shown()[i]}% · ${int(info.hours)} hours`);
+        emphasize(true);
+      });
+      span.addEventListener('pointerleave', () => { hideTip(); emphasize(false); });
+      span.addEventListener('click', () => focusRow(i));
     });
 
     $('#resetShares').addEventListener('click', () => {
@@ -980,6 +1070,7 @@
       if (opener) {
         const dialog = $(`#${opener.dataset.open}`);
         if (dialog.id === 'method') renderTables();
+        hideTip();
         dialog.showModal();
         fitAll();
         if (dialog.id === 'share') { imageDirty = true; freshImage(); }
@@ -1045,6 +1136,7 @@
     buildShare();
     buildDialogs();
     buildLevels();
+    buildHover();
     renderPeople();
     renderFocus();
     update();

@@ -7,8 +7,9 @@ A remaining life budget on one screen. Describe a typical week, and the page sho
 ## What's on the screen
 
 - **Your week** as a sentence to fill in, with the hours that are yours and where the rest go.
-- **The week grid**, one square per week, with five zoom levels: your whole life (paler where fewer people your age are still alive), the weeks ahead sorted by what fills them, only your weeks, your weeks split by category, and one square per book, trip or movie. Hover a square for details; the arrow keys switch levels.
-- **The split**: sliders that keep the total at 100%, each row showing what its share buys and how many hours a week that means. Pick a row to zoom into it. The last row is yours to name.
+- **The week grid**, one square per week, with five zoom levels: your whole life (paler where fewer people your age are still alive), the weeks ahead sorted by what fills them, only your weeks, your weeks split by category, and one square per book, trip or movie. Hover a square to outline it and light up its group, with the details in a tooltip; the arrow keys switch levels.
+- **The split**: sliders that keep the total at 100%, each row showing what its share buys and how many hours a week that means. Pick a row, a bar segment or a group in the Split view to zoom into it. The last row is yours to name.
+- **Hover works everywhere there are numbers**: grid squares, split bar segments, legend rows and the counts in the band. Hovering a row, a segment or a legend entry also lights up its squares.
 - **The band**: weekends, summers, full moons and sunsets left; trips and books at your pace; the people who matter; one small change and what it adds up to.
 - **Dialogs** for fine-tuning your day (what counts as an obligation, phone time, time off, birthday, projected death rates), the people who matter, a share card and a weeks poster, and how it works with every number as a table.
 

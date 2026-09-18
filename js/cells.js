@@ -17,13 +17,15 @@
   }
 
   // A scene is a function (width, height) => { cells: [...], labels: [...] } in CSS pixels.
-  // Cell: { k, x, y, s, c: [r, g, b], a?, d? (delay in ms), from?: { x, y, s }, tip? }.
+  // Cell: { k, x, y, s, c: [r, g, b], a?, d? (delay in ms), from?: { x, y, s }, group?, info? }.
+  // `group` ties cells together for hover emphasis; `info` is whatever the page shows on hover.
   // Label: { k, text, x, y, font, color, align? }.
   function createCells(canvas, { duration = 900 } = {}) {
     const ctx = canvas.getContext('2d');
     const cells = new Map();
     const labels = new Map();
     let W = 0, H = 0, dpr = 1, t0 = 0, running = false, scene = null, instant = false;
+    let hover = null; // { group?, key?, stroke? }: dims other groups and outlines one cell
 
     function measure() {
       const r = canvas.getBoundingClientRect();
@@ -55,10 +57,11 @@
         let c = cells.get(t.k);
         if (!c) {
           const f = t.from || { x: t.x + t.s / 2, y: t.y + t.s / 2, s: 0 };
-          c = { ...to, x: f.x, y: f.y, s: f.s };
+          c = { ...to, x: f.x, y: f.y, s: f.s, k: t.k };
           cells.set(t.k, c);
         }
-        c.tip = t.tip;
+        c.group = t.group;
+        c.info = t.info;
         begin(c, to, t.d || 0);
       }
       for (const [k, c] of cells) {
@@ -110,13 +113,22 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
       let fill = '';
+      const dim = hover && hover.group !== undefined;
       for (const c of cells.values()) {
         if (c.a < 0.02 || c.s < 0.3) continue;
         const f = `rgb(${c.r | 0},${c.g | 0},${c.b | 0})`;
         if (f !== fill) { ctx.fillStyle = f; fill = f; }
-        ctx.globalAlpha = c.a;
+        ctx.globalAlpha = dim && c.group !== hover.group ? c.a * 0.25 : c.a;
         const s = Math.max(1 / dpr, px(c.s));
         ctx.fillRect(px(c.x), px(c.y), s, s);
+      }
+      const lifted = hover && hover.key !== undefined && cells.get(hover.key);
+      if (lifted && lifted.a > 0.02) {
+        const s = Math.max(1 / dpr, px(lifted.s));
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = hover.stroke || '#000';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(px(lifted.x) - 1, px(lifted.y) - 1, s + 2, s + 2);
       }
       ctx.textBaseline = 'middle';
       for (const l of labels.values()) {
@@ -130,17 +142,25 @@
       ctx.globalAlpha = 1;
     }
 
-    // The visible cell under a point, in CSS pixels, for hover details.
+    // The visible cell under a point, in CSS pixels. The target includes the gap around
+    // each square so the pointer never falls between two of them.
     function hit(x, y) {
       for (const c of cells.values()) {
-        if (!c.dead && c.to && c.to.a > 0.2 && x >= c.to.x && x <= c.to.x + c.to.s && y >= c.to.y && y <= c.to.y + c.to.s) return c;
+        if (c.dead || !c.to || c.to.a <= 0.05) continue;
+        const pad = Math.max(1, c.to.s * 0.2);
+        if (x >= c.to.x - pad && x <= c.to.x + c.to.s + pad && y >= c.to.y - pad && y <= c.to.y + c.to.s + pad) return c;
       }
       return null;
     }
 
+    function setHover(next) {
+      hover = next;
+      if (!running) draw();
+    }
+
     new ResizeObserver(() => { if (scene) show(scene, false); }).observe(canvas);
 
-    return { show, hit };
+    return { show, hit, setHover };
   }
 
   root.Cells = { createCells, pack };
