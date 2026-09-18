@@ -785,6 +785,7 @@
 
   function openPicker(trigger) {
     if (lastClose.target === trigger && performance.now() - lastClose.t < 300) return; // this click just closed it
+    if (picker.matches(':popover-open')) picker.hidePopover(); // tabbing out of it onto another dropdown
     const select = trigger.tagName === 'SELECT', value = select ? trigger.value : trigger.dataset.value;
     pickTarget = trigger;
     trigger.focus(); // the popover hands focus back to whatever held it when it opened
