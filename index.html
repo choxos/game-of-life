@@ -46,7 +46,7 @@
       <section class="panel you" aria-labelledby="you-h">
         <h2 class="sr-only" id="you-h">Your week</h2>
         <form class="madlib" id="form" autocomplete="off" novalidate>
-          <p>I’m <span id="article">a</span> <input class="field" id="age" type="number" inputmode="numeric" min="10" max="100" aria-label="Your age">-year-old <select class="field" id="sex" aria-label="Sex, optional"><option value="b">person</option><option value="f">woman</option><option value="m">man</option></select> in <select class="field" id="country" aria-label="Country"></select>.</p>
+          <p>I’m <span id="article">a</span> <input class="field" id="age" type="number" inputmode="numeric" min="10" max="100" aria-label="Your age">-year-old <select class="field" id="sex" aria-label="Sex, optional"><option value="b">person</option><option value="f">woman</option><option value="m">man</option></select> in <button class="field field--pick" id="country" type="button" data-pick aria-haspopup="listbox" aria-expanded="false"></button>.</p>
           <p>I sleep about <select class="field" id="sleep" aria-label="Hours of sleep a night"></select> a night.</p>
           <p>I work or study <select class="field" id="work" aria-label="Hours of work or study a day"></select> a day, <select class="field" id="days" aria-label="Workdays a week"></select> a week, and commute <select class="field" id="commute" aria-label="Commuting time a day, there and back"></select> there and back.</p>
           <p>I’d like to stop working at <input class="field" id="retire" type="number" inputmode="numeric" min="30" max="100" aria-label="Age you plan to stop working">.</p>
@@ -86,7 +86,7 @@
         <div class="captions" aria-live="polite">
           <div class="caption" data-level="life">
             <p data-k="capLife"></p>
-            <p class="note"><span data-k="capOdds"></span> Same age in <select class="field field--sm" id="compare" aria-label="Compare with another country"></select>: <b data-k="compareYears"></b>.</p>
+            <p class="note"><span data-k="capOdds"></span> Same age in <button class="field field--sm field--pick" id="compare" type="button" data-pick aria-haspopup="listbox" aria-expanded="false"></button>: <b data-k="compareYears"></b>.</p>
           </div>
           <div class="caption" data-level="ahead" hidden>
             <p data-k="capAhead"></p>
@@ -153,6 +153,12 @@
 
   <div class="tooltip" id="tooltip" role="tooltip" aria-hidden="true"><b></b><span></span></div>
 
+  <div class="picker" id="picker" popover>
+    <input class="picker__search" type="search" role="combobox" aria-expanded="true" aria-controls="pickerList" aria-autocomplete="list" aria-label="Search countries" placeholder="Search countries" autocomplete="off" spellcheck="false">
+    <ul class="picker__list" id="pickerList" role="listbox" aria-label="Countries"></ul>
+    <p class="picker__empty" hidden>No country matches that.</p>
+  </div>
+
   <dialog class="sheet" id="tune" aria-labelledby="tune-h">
     <div class="sheet__body">
       <div class="sheet__head"><h2 id="tune-h" tabindex="-1" autofocus>Fine-tune my day</h2><button class="close" type="button" data-close aria-label="Close">×</button></div>
@@ -185,7 +191,7 @@
         <input class="field field--text" id="oName" maxlength="20" placeholder="Name" aria-label="Their name">
         is <span id="oArticle">a</span> <input class="field" id="oAge" type="number" inputmode="numeric" min="10" max="100" aria-label="Their age">-year-old
         <select class="field" id="oSex" aria-label="Their sex, optional"><option value="b">person</option><option value="f">woman</option><option value="m">man</option></select>
-        in <select class="field" id="oCountry" aria-label="Their country"></select>.
+        in <button class="field field--pick" id="oCountry" type="button" data-pick aria-haspopup="listbox" aria-expanded="false"></button>.
         They sleep <select class="field" id="oSleep" aria-label="Their hours of sleep"></select>,
         work <select class="field" id="oWork" aria-label="Their hours of work a day"></select> a day,
         <select class="field" id="oDays" aria-label="Their workdays a week"></select> a week,

@@ -145,7 +145,7 @@
       return { name: clean(name, 20), age: Math.round(M.clamp(Number(age) || 0, 0, 100)), sex: ['b', 'f', 'm'].includes(sex) ? sex : 'b', visits: Math.round(M.clamp(Number(visits) || 0, 0, 365)) };
     });
     const other = new URLSearchParams(q.get('other') || '');
-    if (other.has('age')) S.other = { ...profileFrom(other, M.DEFAULTS), name: clean(other.get('name'), 20) || 'Them' };
+    if (other.has('age')) S.other = { ...profileFrom(other, M.DEFAULTS), name: clean(other.get('name'), 20) || 'Someone' };
     return true;
   }
 
@@ -720,22 +720,130 @@
     const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
     el.style.width = `${Math.ceil(measure.measureText(text).width + pad + 2)}px`;
   }
-  const fitAll = () => $$('.field:not([type="date"]):not(.field--text)').forEach(fit);
+  const fitAll = () => $$('.field:not([type="date"]):not(.field--text):not(button)').forEach(fit);
 
   const options = (select, values, label) => select.replaceChildren(...values.map(v => new Option(label(v), String(v))));
   const plural = (n, word) => `${n} ${n === 1 ? word : `${word}s`}`;
-  const countryOptions = select => select.replaceChildren(new Option('the world', 'WLD'), ...COUNTRIES.map(k => new Option(withThe(k), k)));
+  /* The country picker: a small box with a search field over a list that filters as you type */
+
+  const ALIASES = {
+    USA: 'us usa america', GBR: 'uk britain great britain england scotland wales', ARE: 'uae emirates',
+    TUR: 'turkey', CZE: 'czech republic', CIV: 'ivory coast', NLD: 'holland', SWZ: 'swaziland',
+    COD: 'drc congo kinshasa', COG: 'congo brazzaville', CPV: 'cape verde', TLS: 'east timor',
+  };
+  const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, "'").toLowerCase();
+  const picker = $('#picker'), search = $('.picker__search', picker), pickList = $('.picker__list', picker);
+  let pickTarget = null, pickItems = [], activeItem = null, lastClose = { t: 0, target: null };
+
+  function setCountryField(el, code) {
+    el.dataset.value = code;
+    el.textContent = code === 'WLD' ? 'the world' : withThe(code);
+    el.setAttribute('aria-label', `Country: ${el.textContent}`);
+  }
+
+  function setActive(li) {
+    activeItem?.classList.remove('is-active');
+    activeItem = li || null;
+    if (activeItem) {
+      activeItem.classList.add('is-active');
+      search.setAttribute('aria-activedescendant', activeItem.id);
+    } else search.removeAttribute('aria-activedescendant');
+  }
+
+  // A nickname typed in full comes first, then names with a word starting with what you typed, then the rest.
+  const pickRank = (li, q) => (` ${ALIASES[li.dataset.code] || ''} `.includes(` ${q} `) ? 0 : ` ${norm(li.textContent)}`.includes(` ${q}`) ? 1 : 2);
+  function filterPicker() {
+    const q = norm(search.value.trim());
+    const shown = q ? pickItems.filter(li => li.dataset.search.includes(q)) : pickItems;
+    if (q) shown.sort((a, b) => pickRank(a, q) - pickRank(b, q));
+    pickList.replaceChildren(...shown);
+    $('.picker__empty', picker).hidden = shown.length > 0;
+    setActive(q ? shown[0] : pickItems.find(li => li.getAttribute('aria-selected') === 'true'));
+  }
+
+  function placePicker() {
+    const r = pickTarget.getBoundingClientRect(), below = innerHeight - r.bottom - 12, above = r.top - 12;
+    const up = below < 280 && above > below;
+    pickList.style.maxHeight = `${Math.max(140, Math.min(300, (up ? above : below) - 64))}px`;
+    const w = picker.offsetWidth, h = picker.offsetHeight;
+    picker.style.left = `${Math.min(Math.max(8, r.left), innerWidth - w - 8)}px`;
+    picker.style.top = `${up ? r.top - h - 6 : r.bottom + 6}px`;
+  }
+
+  function openPicker(trigger) {
+    if (lastClose.target === trigger && performance.now() - lastClose.t < 300) return; // this click just closed it
+    pickTarget = trigger;
+    const host = trigger.closest('dialog') || document.body; // inside a modal dialog, the picker must live in it
+    if (picker.parentElement !== host) host.append(picker);
+    pickItems.forEach(li => li.setAttribute('aria-selected', String(li.dataset.code === trigger.dataset.value)));
+    search.value = '';
+    filterPicker();
+    picker.showPopover();
+    trigger.setAttribute('aria-expanded', 'true');
+    placePicker();
+    activeItem?.scrollIntoView({ block: 'center' });
+    search.focus();
+  }
+
+  function choose(code) {
+    const target = pickTarget;
+    setCountryField(target, code);
+    picker.hidePopover();
+    target.focus();
+    target.dispatchEvent(new CustomEvent('pick', { detail: code }));
+  }
+
+  function buildPicker() {
+    pickItems = ['WLD', ...COUNTRIES].map(code => {
+      const li = document.createElement('li'), p = T.places[code];
+      li.id = `country-${code}`;
+      li.setAttribute('role', 'option');
+      li.dataset.code = code;
+      li.textContent = code === 'WLD' ? 'The world, on average' : NAMES[code];
+      li.dataset.search = norm([li.textContent, p.n, code, p.a2, ALIASES[code] || ''].join(' '));
+      li.addEventListener('pointermove', () => { if (activeItem !== li) setActive(li); });
+      li.addEventListener('click', () => choose(code));
+      return li;
+    });
+    search.addEventListener('input', filterPicker);
+    search.addEventListener('keydown', e => {
+      const shown = [...pickList.children];
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const i = shown.indexOf(activeItem), next = shown[Math.min(shown.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)))];
+        setActive(next);
+        next?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (activeItem) choose(activeItem.dataset.code);
+      } else if (e.key === 'Escape') {
+        e.preventDefault(); // a search field would only clear its text; close the picker instead
+        picker.hidePopover();
+      }
+    });
+    // beforetoggle fires in step with the click that dismisses the picker; toggle fires later.
+    picker.addEventListener('beforetoggle', e => {
+      if (e.newState === 'closed' && pickTarget) lastClose = { t: performance.now(), target: pickTarget };
+    });
+    picker.addEventListener('toggle', e => {
+      if (e.newState !== 'closed' || !pickTarget) return;
+      pickTarget.setAttribute('aria-expanded', 'false');
+      if (picker.contains(document.activeElement) || document.activeElement === document.body) pickTarget.focus();
+    });
+    for (const trigger of $$('[data-pick]')) trigger.addEventListener('click', () => openPicker(trigger));
+    addEventListener('resize', () => { if (picker.matches(':popover-open')) picker.hidePopover(); });
+    $('#country').addEventListener('pick', e => { S.country = e.detail; update(); });
+    $('#compare').addEventListener('pick', e => { S.vs = e.detail; update(); });
+  }
 
   function buildForm() {
-    countryOptions($('#country'));
-    countryOptions($('#compare'));
     options($('#sleep'), OPTIONS.sleep, h => duration(h));
     options($('#work'), OPTIONS.work, h => (h === 0 ? '0 hours' : duration(h)));
     options($('#days'), OPTIONS.days, d => plural(d, 'day'));
     options($('#commute'), OPTIONS.commute, h => duration(h));
     options($('#weeksOff'), OPTIONS.weeksOff, w => plural(w, 'week'));
 
-    const selects = { sex: 'sex', country: 'country', compare: 'vs', sleep: 'sleep', work: 'work', days: 'days', commute: 'commute', weeksOff: 'weeksOff' };
+    const selects = { sex: 'sex', sleep: 'sleep', work: 'work', days: 'days', commute: 'commute', weeksOff: 'weeksOff' };
     for (const [id, key] of Object.entries(selects)) {
       const el = $(`#${id}`);
       el.value = String(S[key]);
@@ -795,7 +903,7 @@
     $('#oAge').value = String(p.age);
     $('#oArticle').textContent = article(p.age);
     $('#oSex').value = p.sex;
-    $('#oCountry').value = p.country;
+    setCountryField($('#oCountry'), p.country);
     $('#oSleep').value = String(nearest(OPTIONS.sleep, p.sleep));
     $('#oWork').value = String(nearest(OPTIONS.work, p.work));
     $('#oDays').value = String(nearest(OPTIONS.days, p.days));
@@ -807,10 +915,10 @@
   function readCompare() {
     return {
       ...otherBase,
-      name: clean($('#oName').value, 20) || 'Them',
+      name: clean($('#oName').value, 20) || 'Someone',
       age: Math.round(M.clamp(Number($('#oAge').value) || otherBase.age, 10, 100)),
       sex: $('#oSex').value,
-      country: $('#oCountry').value,
+      country: $('#oCountry').dataset.value,
       sleep: Number($('#oSleep').value),
       work: Number($('#oWork').value),
       days: Number($('#oDays').value),
@@ -820,7 +928,6 @@
   }
 
   function buildCompare() {
-    countryOptions($('#oCountry'));
     options($('#oSleep'), OPTIONS.sleep, h => duration(h));
     options($('#oWork'), OPTIONS.work, h => (h === 0 ? '0 hours' : duration(h)));
     options($('#oDays'), OPTIONS.days, d => plural(d, 'day'));
@@ -896,6 +1003,8 @@
     age.readOnly = !!dob;
     age.title = dob ? 'From your birthday. Clear it in Fine-tune my day to type an age.' : '';
     if (dob) age.value = String(S.age);
+    setCountryField($('#country'), S.country);
+    setCountryField($('#compare'), S.vs);
     const scrub = $('#retireRange'), retire = $('#retire');
     scrub.value = String(S.retire);
     scrub.style.setProperty('--p', ((S.retire - 30) / 60) * 100);
@@ -1322,6 +1431,7 @@
     buildLevels();
     buildHover();
     buildCompare();
+    buildPicker();
     renderPeople();
     renderFocus();
     update();

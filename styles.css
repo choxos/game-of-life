@@ -197,6 +197,7 @@ input.field::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .field option { color: var(--color-ink); background-color: var(--color-paper); }
 .field--sm { font-family: var(--font-body); font-weight: 600; font-size: inherit; }
 .field--text { text-align: left; }
+.field--pick { max-width: 100%; text-align: left; }
 input[type="date"].field { text-align: left; cursor: pointer; }
 
 input[type="range"] {
@@ -350,6 +351,52 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 
 .stage { position: relative; height: 62vh; min-height: 16rem; }
 .stage canvas { display: block; width: 100%; height: 100%; }
+
+/* Country picker: a small box, search on top, a list that filters as you type. */
+.picker {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(19rem, 100vw - 1rem);
+  padding: 0.5rem;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-sheet);
+  font: 400 var(--text-base) / 1.4 var(--font-body);
+}
+
+.picker:popover-open { display: grid; gap: 0.4rem; animation: sheet-in var(--dur-short) var(--ease-out); }
+
+.picker__search {
+  width: 100%;
+  min-height: 2.3rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-rule);
+  border-radius: 8px;
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.picker__search:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 0; }
+
+.picker__list { list-style: none; margin: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+
+.picker__list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.picker__list li.is-active { background: var(--color-paper-2); }
+.picker__list li[aria-selected="true"] { color: var(--color-accent-ink); font-weight: 600; }
+.picker__list li[aria-selected="true"]::after { content: "✓"; }
+.picker__empty { padding: 0.35rem 0.6rem; color: var(--color-muted); font-size: var(--text-sm); }
 
 /* One tooltip for every chart: the value leads, the label follows. */
 .tooltip {
@@ -663,5 +710,5 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
     animation-duration: 150ms !important;
     transition-duration: 150ms !important;
   }
-  .sheet[open] { animation: none; }
+  .sheet[open], .picker:popover-open { animation: none; }
 }
