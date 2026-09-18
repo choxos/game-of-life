@@ -352,7 +352,7 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 .stage { position: relative; height: 62vh; min-height: 16rem; }
 .stage canvas { display: block; width: 100%; height: 100%; }
 
-/* Country picker: a small box, search on top, a list that filters as you type. */
+/* The picker: a small box for every dropdown. The country one adds a search field on top. */
 .picker {
   position: fixed;
   inset: auto;
@@ -368,6 +368,7 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 }
 
 .picker:popover-open { display: grid; gap: 0.4rem; animation: sheet-in var(--dur-short) var(--ease-out); }
+.picker--list { width: max-content; min-width: 8rem; max-width: min(19rem, 100vw - 1rem); }
 
 .picker__search {
   width: 100%;
@@ -383,6 +384,7 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 .picker__search:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 0; }
 
 .picker__list { list-style: none; margin: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.picker__list:focus { outline: none; } /* the highlighted row shows where you are */
 
 .picker__list li {
   display: flex;

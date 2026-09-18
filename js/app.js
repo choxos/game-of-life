@@ -714,17 +714,18 @@
 
   const measure = document.createElement('canvas').getContext('2d');
   function fit(el) {
+    if (el.tagName === 'BUTTON') return; // the country buttons size to their own text
     const cs = getComputedStyle(el);
     measure.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
     const text = el.tagName === 'SELECT' ? el.options[el.selectedIndex]?.text || '' : el.value || el.placeholder || '0';
     const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
     el.style.width = `${Math.ceil(measure.measureText(text).width + pad + 2)}px`;
   }
-  const fitAll = () => $$('.field:not([type="date"]):not(.field--text):not(button)').forEach(fit);
+  const fitAll = () => $$('.field:not([type="date"]):not(.field--text)').forEach(fit);
 
   const options = (select, values, label) => select.replaceChildren(...values.map(v => new Option(label(v), String(v))));
   const plural = (n, word) => `${n} ${n === 1 ? word : `${word}s`}`;
-  /* The country picker: a small box with a search field over a list that filters as you type */
+  /* The picker: a small box for every dropdown. The country one has a search field that filters as you type. */
 
   const ALIASES = {
     USA: 'us usa america', GBR: 'uk britain great britain england scotland wales', ARE: 'uae emirates',
@@ -733,7 +734,7 @@
   };
   const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, "'").toLowerCase();
   const picker = $('#picker'), search = $('.picker__search', picker), pickList = $('.picker__list', picker);
-  let pickTarget = null, pickItems = [], activeItem = null, lastClose = { t: 0, target: null };
+  let pickTarget = null, pickItems = [], countryItems = [], activeItem = null, lastClose = { t: 0, target: null };
 
   function setCountryField(el, code) {
     el.dataset.value = code;
@@ -744,10 +745,22 @@
   function setActive(li) {
     activeItem?.classList.remove('is-active');
     activeItem = li || null;
+    const owner = search.hidden ? pickList : search; // whichever holds focus
     if (activeItem) {
       activeItem.classList.add('is-active');
-      search.setAttribute('aria-activedescendant', activeItem.id);
-    } else search.removeAttribute('aria-activedescendant');
+      owner.setAttribute('aria-activedescendant', activeItem.id);
+    } else owner.removeAttribute('aria-activedescendant');
+  }
+
+  function pickItem(code, text, id) {
+    const li = document.createElement('li');
+    li.id = id;
+    li.setAttribute('role', 'option');
+    li.dataset.code = code;
+    li.textContent = text;
+    li.addEventListener('pointermove', () => { if (activeItem !== li) setActive(li); });
+    li.addEventListener('click', () => choose(code));
+    return li;
   }
 
   // A nickname typed in full comes first, then names with a word starting with what you typed, then the rest.
@@ -772,48 +785,53 @@
 
   function openPicker(trigger) {
     if (lastClose.target === trigger && performance.now() - lastClose.t < 300) return; // this click just closed it
+    const select = trigger.tagName === 'SELECT', value = select ? trigger.value : trigger.dataset.value;
     pickTarget = trigger;
+    trigger.focus(); // the popover hands focus back to whatever held it when it opened
     const host = trigger.closest('dialog') || document.body; // inside a modal dialog, the picker must live in it
     if (picker.parentElement !== host) host.append(picker);
-    pickItems.forEach(li => li.setAttribute('aria-selected', String(li.dataset.code === trigger.dataset.value)));
+    pickItems = select ? [...trigger.options].map((o, i) => pickItem(o.value, o.text, `option-${i}`)) : countryItems;
+    pickItems.forEach(li => li.setAttribute('aria-selected', String(li.dataset.code === value)));
+    picker.classList.toggle('picker--list', select);
+    search.hidden = select;
+    pickList.setAttribute('aria-label', select ? trigger.getAttribute('aria-label') || trigger.labels[0]?.textContent || 'Options' : 'Countries');
     search.value = '';
     filterPicker();
     picker.showPopover();
     trigger.setAttribute('aria-expanded', 'true');
     placePicker();
     activeItem?.scrollIntoView({ block: 'center' });
-    search.focus();
+    (select ? pickList : search).focus();
   }
 
   function choose(code) {
     const target = pickTarget;
-    setCountryField(target, code);
     picker.hidePopover();
     target.focus();
-    target.dispatchEvent(new CustomEvent('pick', { detail: code }));
+    if (target.tagName !== 'SELECT') {
+      setCountryField(target, code);
+      target.dispatchEvent(new CustomEvent('pick', { detail: code }));
+    } else if (target.value !== code) {
+      target.value = code;
+      for (const type of ['input', 'change']) target.dispatchEvent(new Event(type, { bubbles: true }));
+    }
   }
 
   function buildPicker() {
-    pickItems = ['WLD', ...COUNTRIES].map(code => {
-      const li = document.createElement('li'), p = T.places[code];
-      li.id = `country-${code}`;
-      li.setAttribute('role', 'option');
-      li.dataset.code = code;
-      li.textContent = code === 'WLD' ? 'The world, on average' : NAMES[code];
+    countryItems = ['WLD', ...COUNTRIES].map(code => {
+      const p = T.places[code], li = pickItem(code, code === 'WLD' ? 'The world, on average' : NAMES[code], `country-${code}`);
       li.dataset.search = norm([li.textContent, p.n, code, p.a2, ALIASES[code] || ''].join(' '));
-      li.addEventListener('pointermove', () => { if (activeItem !== li) setActive(li); });
-      li.addEventListener('click', () => choose(code));
       return li;
     });
     search.addEventListener('input', filterPicker);
-    search.addEventListener('keydown', e => {
+    picker.addEventListener('keydown', e => {
       const shown = [...pickList.children];
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
         const i = shown.indexOf(activeItem), next = shown[Math.min(shown.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)))];
         setActive(next);
         next?.scrollIntoView({ block: 'nearest' });
-      } else if (e.key === 'Enter') {
+      } else if (e.key === 'Enter' || (e.key === ' ' && search.hidden)) {
         e.preventDefault();
         if (activeItem) choose(activeItem.dataset.code);
       } else if (e.key === 'Escape') {
@@ -821,16 +839,29 @@
         picker.hidePopover();
       }
     });
-    // beforetoggle fires in step with the click that dismisses the picker; toggle fires later.
+    // beforetoggle fires in step with the click that dismisses the picker; toggle fires later, merged with a reopen.
     picker.addEventListener('beforetoggle', e => {
-      if (e.newState === 'closed' && pickTarget) lastClose = { t: performance.now(), target: pickTarget };
+      if (e.newState !== 'closed' || !pickTarget) return;
+      lastClose = { t: performance.now(), target: pickTarget };
+      pickTarget.setAttribute('aria-expanded', 'false');
     });
     picker.addEventListener('toggle', e => {
-      if (e.newState !== 'closed' || !pickTarget) return;
-      pickTarget.setAttribute('aria-expanded', 'false');
-      if (picker.contains(document.activeElement) || document.activeElement === document.body) pickTarget.focus();
+      if (e.newState === 'closed' && (picker.contains(document.activeElement) || document.activeElement === document.body)) pickTarget.focus();
     });
-    for (const trigger of $$('[data-pick]')) trigger.addEventListener('click', () => openPicker(trigger));
+    // Dropdowns open here too: a Mac sizes the native menu from the select's own font, and the sentence's is big.
+    // Phones keep their native wheel or sheet. Blocking mousedown keeps the native menu shut; the picker opens
+    // on click, after the press that would otherwise dismiss it again.
+    const coarse = matchMedia('(pointer: coarse)');
+    const dropdown = e => !coarse.matches && e.target.closest?.('select.field');
+    document.addEventListener('mousedown', e => { if (e.button === 0 && dropdown(e)) e.preventDefault(); });
+    document.addEventListener('click', e => {
+      const trigger = e.target.closest?.('[data-pick]') || dropdown(e);
+      if (trigger) openPicker(trigger);
+    });
+    document.addEventListener('keydown', e => {
+      const trigger = dropdown(e);
+      if (trigger && [' ', 'Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); openPicker(trigger); }
+    });
     addEventListener('resize', () => { if (picker.matches(':popover-open')) picker.hidePopover(); });
     $('#country').addEventListener('pick', e => { S.country = e.detail; update(); });
     $('#compare').addEventListener('pick', e => { S.vs = e.detail; update(); });
@@ -891,6 +922,7 @@
     cohort.addEventListener('change', () => { S.cohort = cohort.checked; update(); });
 
     $('#retireRange').addEventListener('input', e => { S.retire = Number(e.target.value); stopIntro(); update(); });
+    $('#changePick').addEventListener('change', e => { changeId = e.target.value; renderBand(); });
   }
 
   /* Compare two lives */
@@ -1389,7 +1421,7 @@
     for (const b of $$('.levels button')) b.addEventListener('click', () => { stopIntro(); setLevel(b.dataset.level); });
     document.addEventListener('keydown', e => {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-      if (document.querySelector('dialog[open]') || e.target.closest('input, select, textarea')) return;
+      if (document.querySelector('dialog[open]') || e.target.closest('input, select, textarea, #picker')) return;
       stopIntro();
       const i = LEVELS.indexOf(level) + (e.key === 'ArrowRight' ? 1 : -1);
       if (i >= 0 && i < LEVELS.length) setLevel(LEVELS[i]);
