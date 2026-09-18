@@ -33,7 +33,7 @@
   --text-sm: 0.8125rem;
   --text-base: 0.9375rem;
   --text-md: 1.0625rem;
-  --text-madlib: clamp(1.05rem, 0.7rem + 0.9vh, 1.35rem);
+  --text-madlib: clamp(1.3rem, 0.7rem + 1.5vh, 1.9rem);
   --text-figure: clamp(2.2rem, 0.6rem + 4.2vh, 3.6rem);
   --text-title: clamp(1.1rem, 0.75rem + 1vh, 1.5rem);
 
@@ -283,7 +283,7 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 
 /* Left: the week you describe and what it leaves */
 
-.madlib { font-family: var(--font-display); font-size: var(--text-madlib); line-height: 1.45; }
+.madlib { font-family: var(--font-display); font-size: var(--text-madlib); line-height: 1.4; }
 .madlib > p + p { margin-top: 0.2em; }
 
 .you__tools { display: flex; flex-wrap: wrap; gap: 0 var(--space-md); }
@@ -635,7 +635,7 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 @media (min-width: 60rem) {
   .tagline { order: 0; flex-basis: auto; margin-right: auto; }
   .top__actions { margin-left: 0; }
-  .board { grid-template-columns: minmax(15rem, 0.85fr) minmax(0, 1.7fr) minmax(19.5rem, 1fr); }
+  .board { grid-template-columns: minmax(16rem, 1fr) minmax(0, 1.75fr) minmax(19.5rem, 1fr); }
   .band { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1.3fr); gap: var(--space-xl); padding-block: clamp(0.4rem, 1.2vh, 0.9rem); line-height: 1.35; }
 }
 
@@ -647,6 +647,8 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
   .panel { overflow-y: auto; overflow-x: hidden; padding-inline: 0.5rem; overscroll-behavior: contain; scrollbar-width: thin; }
   .weeks { overflow: hidden; }
   .stage { flex: 1 1 auto; height: auto; min-height: 0; }
+  .you { gap: clamp(0.4rem, 1.2vh, 0.75rem); }
+  .legend { line-height: 1.35; }
 }
 
 @media (pointer: coarse) {
