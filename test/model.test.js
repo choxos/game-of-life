@@ -10,7 +10,7 @@ const near = (actual, expected, tol, msg) =>
 // The worked example from the brief: 47.3 years left, 8 h sleep, 8 h work, about 4.2 h of upkeep a day.
 const example = {
   ...M.DEFAULTS, age: 34, retire: 65, sleep: 8, work: 8, days: 5, commute: 1.25,
-  weeksOff: M.WEEKS - 49.5, routine: [4.18, 0, 0, 0, 0], mine: [false, false, false, false, true],
+  weeksOff: M.WEEKS - 49.5, routine: [4.18, 0, 0, 0, 0, 0], mine: [false, false, false, false, true, true],
 };
 const b = M.budget(example, 47.3);
 near(b.h.waking, 276000, 1500, 'waking hours');
@@ -27,7 +27,7 @@ assert.equal(retired.h.commute, 0);
 assert.equal(retired.weekly.now, null);
 
 // Moving a routine item to "mine" gives its hours back.
-const moved = M.budget({ ...example, mine: [true, false, false, false, true] }, 47.3);
+const moved = M.budget({ ...example, mine: [true, false, false, false, true, true] }, 47.3);
 near(moved.h.free - b.h.free, 4.18 * M.DAYS * 47.3, 1e-6, 'moving upkeep to mine');
 
 // Week rows: 52 cells per full year, and the free cells match the free hours.
@@ -58,5 +58,36 @@ near(commute.h, 0.5 * 5 * 49.5 * 31, 1e-6, 'commute change');
 assert.equal(M.remainingYears(window.LIFE_TABLES, 'CAN', 'b', 34), 50.1);
 assert.ok(M.remainingYears(window.LIFE_TABLES, 'NGA', 'b', 34) > window.LIFE_TABLES.places.NGA.b[0] - 34);
 assert.equal(M.remainingYears(window.LIFE_TABLES, 'NOPE', 'b', 200), window.LIFE_TABLES.places.WLD.b[100]);
+
+// Survival: the curve integrates back to e(x), the median sits above the mean, cohort adds years.
+const T = window.LIFE_TABLES;
+const can = M.lifeFacts(T, 'CAN', 'b', 34, false);
+let area = 0;
+for (let t = 0; t < 130; t++) area += (M.survivalAt(can, t) + M.survivalAt(can, t + 1)) / 2;
+near(area, can.years, 0.3, 'survival area');
+assert.ok(can.median > can.years && can.q3 > can.median);
+const jpn = M.lifeFacts(T, 'JPN', 'b', 30, true);
+assert.ok(jpn.years > M.lifeFacts(T, 'JPN', 'b', 30, false).years + 3, 'cohort adds years in Japan');
+assert.equal(T.places.CAN.c.b[100], T.places.CAN.b[100]);
+
+// Shared years with a parent: positive and below either person's own expectation.
+const mom = M.lifeFacts(T, 'CAN', 'f', 62, false);
+const shared = M.sharedYears(can, mom);
+assert.ok(shared > 0 && shared < Math.min(can.years, mom.years));
+
+// Healthy years are a share of the years ahead; places without WHO data return null.
+const healthy = M.healthyYears(T, 'CAN', 'b', 34, can.years);
+assert.ok(healthy > 0.6 * can.years && healthy < can.years);
+assert.equal(M.healthyYears({ places: { WLD: {} } }, 'WLD', 'b', 34, 50), null);
+
+// Dates: whole years and days.
+assert.equal(M.ageOn(new Date(1990, 5, 15), new Date(2026, 5, 14)), 35);
+assert.equal(M.ageOn(new Date(1990, 5, 15), new Date(2026, 5, 15)), 36);
+assert.equal(M.daysBetween(new Date(2026, 0, 1), new Date(2026, 11, 31)), 364);
+
+// The phone what-if cuts at most 45 minutes of phone time.
+const scroll = M.changes({ ...example, routine: [4.18, 0, 0, 0, 0, 0.5] }, b).find(c => c.id === 'scroll');
+near(scroll.h, 0.5 * M.DAYS * 47.3, 1e-6, 'phone change');
+assert.equal(M.changes(example, b).find(c => c.id === 'scroll'), undefined);
 
 console.log('model ok');

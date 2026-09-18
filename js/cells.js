@@ -17,7 +17,7 @@
   }
 
   // A scene is a function (width, height) => { cells: [...], labels: [...] } in CSS pixels.
-  // Cell: { k, x, y, s, c: [r, g, b], a?, d? (delay in ms), from?: { x, y, s } }.
+  // Cell: { k, x, y, s, c: [r, g, b], a?, d? (delay in ms), from?: { x, y, s }, tip? }.
   // Label: { k, text, x, y, font, color, align? }.
   function createCells(canvas, { duration = 900 } = {}) {
     const ctx = canvas.getContext('2d');
@@ -58,6 +58,7 @@
           c = { ...to, x: f.x, y: f.y, s: f.s };
           cells.set(t.k, c);
         }
+        c.tip = t.tip;
         begin(c, to, t.d || 0);
       }
       for (const [k, c] of cells) {
@@ -129,9 +130,17 @@
       ctx.globalAlpha = 1;
     }
 
+    // The visible cell under a point, in CSS pixels, for hover details.
+    function hit(x, y) {
+      for (const c of cells.values()) {
+        if (!c.dead && c.to && c.to.a > 0.2 && x >= c.to.x && x <= c.to.x + c.to.s && y >= c.to.y && y <= c.to.y + c.to.s) return c;
+      }
+      return null;
+    }
+
     new ResizeObserver(() => { if (scene) show(scene, false); }).observe(canvas);
 
-    return { show };
+    return { show, hit };
   }
 
   root.Cells = { createCells, pack };
