@@ -2,6 +2,10 @@
 
 How much of your life is actually yours?
 
+**Try it:** https://choxos.github.io/game-of-life/
+
+![Game of Life on one screen: your week as a sentence, the grid of weeks ahead sorted by sleep, work, commuting, upkeep and your own time, and sliders that split your free hours](docs/screenshot.png)
+
 A remaining life budget on one screen. Describe a typical week, and the page shows the rest of your life in weeks, the hours that are yours once sleep, work, commuting and upkeep are paid for, and what those hours could hold: books, trips, dinners, languages, or doing nothing at all.
 
 ## What's on the screen
