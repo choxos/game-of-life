@@ -594,6 +594,11 @@
   canvas.addEventListener('pointerleave', e => { if (e.pointerType !== 'touch') clearGrid(); });
   canvas.addEventListener('pointercancel', clearGrid);
   document.addEventListener('pointerdown', e => { if (e.pointerType === 'touch' && e.target !== canvas) clearGrid(); });
+  // A quick swipe over the grid scrolls the page. Hold a moment first and the page stays put while the
+  // tooltip follows the finger from square to square.
+  let touchAt = 0;
+  canvas.addEventListener('touchstart', e => { touchAt = e.timeStamp; }, { passive: true });
+  canvas.addEventListener('touchmove', e => { if (e.cancelable && e.timeStamp - touchAt > 200) e.preventDefault(); }, { passive: false });
   canvas.addEventListener('click', e => {
     const cell = level === 'plans' && cellAt(e);
     if (cell && cell.group !== undefined) { clearGrid(); focusRow(cell.group); }
