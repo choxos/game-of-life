@@ -1495,5 +1495,8 @@
       });
   }
 
-  init();
+  // Safari can run deferred scripts before the stylesheets apply, and the canvas colors, fonts and
+  // field widths all come from them; without this wait the week grid draws in black.
+  if (getComputedStyle(document.documentElement).getPropertyValue('--color-paper')) init();
+  else addEventListener('load', () => init(), { once: true });
 })();
