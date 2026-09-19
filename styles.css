@@ -350,6 +350,8 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 4px; }
 .levels button[aria-pressed="true"] { background: var(--color-paper); color: var(--color-ink); box-shadow: var(--shadow-whisper); }
 
 .stage { position: relative; height: 62vh; min-height: 16rem; }
+/* Holding a finger on a square shows its tooltip; it must not select the page or open the callout. */
+.stage { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 .stage canvas { display: block; width: 100%; height: 100%; }
 
 /* The picker: a small box for every dropdown. The country one adds a search field on top. */

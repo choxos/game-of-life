@@ -560,13 +560,14 @@
   /* Hover: one tooltip for the grid, the split bar, the legend and the band */
 
   const tooltip = $('#tooltip');
-  function showTip(x, y, value, label) {
+  function showTip(x, y, value, label, finger) {
     tooltip.firstElementChild.textContent = value;
     tooltip.lastElementChild.textContent = label;
     tooltip.classList.add('is-on');
     const w = tooltip.offsetWidth, h = tooltip.offsetHeight;
-    const left = x + 16 + w > innerWidth ? x - w - 12 : x + 16;
-    const top = y + 16 + h > innerHeight ? y - h - 12 : y + 16;
+    let left = x + 16 + w > innerWidth ? x - w - 12 : x + 16;
+    let top = y + 16 + h > innerHeight ? y - h - 12 : y + 16;
+    if (finger) { left = Math.min(x - w / 2, innerWidth - w - 4); top = y - h - 32 < 4 ? y + 32 : y - h - 32; } // above, clear of the hand
     tooltip.style.transform = `translate(${Math.max(4, left)}px, ${Math.max(4, top)}px)`;
   }
   const hideTip = () => tooltip.classList.remove('is-on');
@@ -583,13 +584,16 @@
     const cell = cellAt(e);
     if (!cell || !cell.info) return clearGrid();
     stage.setHover({ group: cell.group, key: cell.k, stroke: rgb(C.ink) });
-    showTip(e.clientX, e.clientY, cell.info.value, cell.info.label);
+    showTip(e.clientX, e.clientY, cell.info.value, cell.info.label, e.pointerType === 'touch');
     canvas.style.cursor = level === 'plans' ? 'pointer' : 'default';
     lightRow(level === 'plans' ? cell.group : -1);
   }
   canvas.addEventListener('pointermove', hoverGrid);
   canvas.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') hoverGrid(e); });
-  canvas.addEventListener('pointerleave', clearGrid);
+  // A finger leaves the canvas each time it lifts, so its tooltip stays until a touch elsewhere or a scroll.
+  canvas.addEventListener('pointerleave', e => { if (e.pointerType !== 'touch') clearGrid(); });
+  canvas.addEventListener('pointercancel', clearGrid);
+  document.addEventListener('pointerdown', e => { if (e.pointerType === 'touch' && e.target !== canvas) clearGrid(); });
   canvas.addEventListener('click', e => {
     const cell = level === 'plans' && cellAt(e);
     if (cell && cell.group !== undefined) { clearGrid(); focusRow(cell.group); }
